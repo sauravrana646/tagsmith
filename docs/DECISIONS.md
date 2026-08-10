@@ -91,6 +91,13 @@ On approve: create Gmail label, insert taxonomy row, apply to the triggering mes
 - `credentials.json` and `token.json` in platform config dir; both patterns in `.gitignore` from the first commit.
 - First real e2e: run `tagsmith auth` locally after creating a Desktop OAuth client (consent screen External + Testing mode with your address as test user).
 
+## Secret scanning / merge gate
+
+- **Gitleaks** is the required in-repo secret detector (`secret-scan` job + `.gitleaks.toml`).
+- **GitGuardian** is optional monitoring only — not a substitute for the CI gate.
+- Merges to `main` are blocked by the aggregating **`quality-gate`** GitHub Actions check once branch protection requires it (setup steps in [CONTRIBUTING.md](CONTRIBUTING.md)).
+- Also enable GitHub native secret scanning + push protection when available.
+
 ## Explicit non-goals for this pass
 
 No LangGraph, no web UI, no vector DB, no MCP, and no empty placeholder modules for them.
