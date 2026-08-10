@@ -226,16 +226,42 @@ def _print_message_panel(message_payload: dict[str, object], title: str) -> None
 
 
 def _prompt_existing_label(active: list[str], *, default: str | None = None) -> str:
+    """Prompt for an existing taxonomy label by index (or exact key)."""
+    if not active:
+        raise typer.BadParameter("No active labels available")
+
     console.print("Active labels:")
-    # Print in compact columns without Rich interpreting brackets.
-    for i in range(0, len(active), 4):
-        chunk = active[i : i + 4]
-        console.print("  " + "  |  ".join(chunk))
+    for idx, key in enumerate(active, start=1):
+        marker = " ←" if default is not None and key == default else ""
+        console.print(f"  {idx:>2}. {key}{marker}")
+
+    default_prompt: str | None = None
+    if default is not None and default in active:
+        default_prompt = str(active.index(default) + 1)
+
     while True:
-        raw = str(typer.prompt("Existing label key", default=default or "")).strip()
+        raw = str(
+            typer.prompt(
+                "Label number (or key)",
+                default=default_prompt if default_prompt is not None else "",
+            )
+        ).strip()
+        if not raw:
+            console.print("[red]Enter a number from the list, or a label key.[/red]")
+            continue
+        if raw.isdigit():
+            number = int(raw)
+            if 1 <= number <= len(active):
+                return active[number - 1]
+            console.print(
+                f"[red]Number out of range. Enter 1-{len(active)}.[/red]"
+            )
+            continue
         if raw in active:
             return raw
-        console.print(f"[red]Unknown label '{raw}'. Pick one from the list above.[/red]")
+        console.print(
+            f"[red]Unknown '{raw}'. Enter a number 1-{len(active)} or an exact key.[/red]"
+        )
 
 
 def _review_needs_review(ops: ReviewOps) -> None:
