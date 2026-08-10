@@ -123,6 +123,80 @@ class ReviewOps:
     def reject_proposal(self, proposal_id: int) -> Proposal:
         return self.queue.reject_proposal(proposal_id)
 
+    def assign_existing_label(
+        self,
+        proposal_id: int,
+        label_key: str,
+        *,
+        apply: bool = True,
+    ) -> ClassificationRecord:
+        """Resolve a proposal by filing the message under an existing taxonomy label."""
+        if label_key not in self.taxonomy.active_keys():
+            raise ValueError(f"unknown active label: {label_key}")
+
+        proposal = self.session.get(Proposal, proposal_id)
+        if proposal is None:
+            raise KeyError(f"proposal {proposal_id} not found")
+        if proposal.status != ProposalStatus.PENDING:
+            raise ValueError(f"proposal {proposal_id} is {proposal.status}")
+
+        message = self.session.get(Message, proposal.gmail_id)
+        if message is None:
+            raise KeyError(proposal.gmail_id)
+
+        label_id: str | None = None
+        remove_ids: list[str] = []
+        if apply:
+            if message.applied_label_id:
+                remove_ids.append(message.applied_label_id)
+            # Drop needs-review marker if present.
+            for label in self.gmail.list_labels():
+                if label.get("name") == self.settings.needs_review_label_name:
+                    rid = str(label.get("id") or "")
+                    if rid:
+                        remove_ids.append(rid)
+                    break
+            label = self.gmail.get_or_create_label(self.settings.gmail_label_name(label_key))
+            label_id = str(label.get("id") or "")
+            self.gmail.modify_labels(
+                proposal.gmail_id,
+                add_label_ids=[label_id],
+                remove_label_ids=remove_ids,
+            )
+
+        proposal.status = ProposalStatus.REJECTED
+        proposal.decided_at = datetime.now(UTC)
+        message.state = MessageState.LABELED
+        message.applied_label_key = label_key
+        message.applied_label_id = label_id
+        message.updated_at = utcnow()
+
+        record = ClassificationRecord(
+            gmail_id=proposal.gmail_id,
+            label_key=label_key,
+            predicted_key=None,
+            final_key=label_key,
+            confidence=None,
+            rationale=(
+                f"Human assigned existing label '{label_key}' "
+                f"(rejected proposal '{proposal.suggested_key}')"
+            ),
+            source=ClassificationSource.HUMAN,
+            applied_at=utcnow() if apply else None,
+            needs_review=False,
+            review_status=ReviewStatus.CHANGED,
+        )
+        self.session.add(record)
+        self.session.commit()
+        self.session.refresh(record)
+        log.info(
+            "proposal.assigned_existing",
+            proposal_id=proposal_id,
+            label_key=label_key,
+            gmail_id=proposal.gmail_id,
+        )
+        return record
+
     def _latest_needs_review_record(self, gmail_id: str) -> ClassificationRecord:
         stmt = (
             select(ClassificationRecord)

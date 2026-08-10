@@ -170,3 +170,49 @@ async def test_approve_proposal_requeues_held(
     assert msg is not None
     assert msg.state == MessageState.LABELED
     assert requeue is not None
+
+
+@pytest.mark.asyncio
+async def test_assign_existing_label_closes_proposal(
+    session, settings: Settings, fake_gmail
+) -> None:
+    from tagsmith.classify import pipeline as pipeline_mod
+    from tagsmith.db.models import ProposalStatus as PS
+
+    async def propose_new(email, **kwargs):  # type: ignore[no-untyped-def]
+        return Classification(
+            label_key=None,
+            confidence=0.9,
+            rationale="OpenAI upsell; fits promotion.",
+            proposed_new=NewCategory(
+                suggested_key="uncategorized-followup",
+                description="Email that did not fit; human should rename.",
+                why_no_existing_fit="fallback",
+            ),
+        )
+
+    pipeline_mod.classify_email = propose_new  # type: ignore[assignment]
+    fake_gmail.messages = {"msg_html_1": dict(HTML_ONLY)}
+    service = SyncService(session, fake_gmail, settings)
+    await service.sync(limit=5, apply=True)
+
+    ops = ReviewOps(session, fake_gmail, settings)
+    proposals = ops.list_proposals()
+    assert len(proposals) == 1
+    proposal_id = proposals[0].proposal.id or 0
+
+    record = ops.assign_existing_label(proposal_id, "promotion", apply=True)
+    assert record.final_key == "promotion"
+    assert record.source == ClassificationSource.HUMAN
+
+    proposal = session.get(type(proposals[0].proposal), proposal_id)
+    assert proposal is not None
+    assert proposal.status == PS.REJECTED
+
+    msg = session.get(Message, "msg_html_1")
+    assert msg is not None
+    assert msg.state == MessageState.LABELED
+    assert msg.applied_label_key == "promotion"
+    assert msg.applied_label_id is not None
+    assert any(msg.applied_label_id in call["add"] for call in fake_gmail.modify_calls)
+

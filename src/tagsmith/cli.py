@@ -6,8 +6,10 @@ import asyncio
 
 import typer
 from rich.console import Console
+from rich.markup import escape
 from rich.panel import Panel
 from rich.table import Table
+from rich.text import Text
 
 from tagsmith import __version__
 from tagsmith.config import Settings, get_settings
@@ -15,6 +17,7 @@ from tagsmith.db.session import get_session, init_db
 from tagsmith.gmail.auth import AuthError, run_auth_flow
 from tagsmith.gmail.client import GmailClient
 from tagsmith.gmail.parser import normalize_message
+from tagsmith.review.display import format_message_for_review
 from tagsmith.services.review_ops import ReviewOps
 from tagsmith.services.sync import SyncService
 from tagsmith.taxonomy.registry import TaxonomyRegistry
@@ -210,13 +213,28 @@ def review_root(ctx: typer.Context) -> None:
 
 
 def _print_message_panel(message_payload: dict[str, object], title: str) -> None:
-    body = str(message_payload.get("body_text") or "")
-    header = (
-        f"From: {message_payload.get('sender', '')}\n"
-        f"Subject: {message_payload.get('subject', '')}\n"
-        f"Date: {message_payload.get('date', '')}\n"
+    text = format_message_for_review(dict(message_payload), body_chars=500)
+    console.print(
+        Panel(
+            Text(text),
+            title=escape(title),
+            border_style="cyan",
+            width=min(100, (console.width or 100)),
+        )
     )
-    console.print(Panel(header + "\n" + body[:2000], title=title))
+
+
+def _prompt_existing_label(active: list[str], *, default: str | None = None) -> str:
+    console.print("Active labels:")
+    # Print in compact columns without Rich interpreting brackets.
+    for i in range(0, len(active), 4):
+        chunk = active[i : i + 4]
+        console.print("  " + "  |  ".join(chunk))
+    while True:
+        raw = str(typer.prompt("Existing label key", default=default or "")).strip()
+        if raw in active:
+            return raw
+        console.print(f"[red]Unknown label '{raw}'. Pick one from the list above.[/red]")
 
 
 def _review_needs_review(ops: ReviewOps) -> None:
@@ -232,14 +250,18 @@ def _review_needs_review(ops: ReviewOps) -> None:
             title=f"{message.gmail_id} · predicted={record.predicted_key} "
             f"conf={record.confidence}",
         )
-        console.print("Actions: [c]onfirm  [p]ick another  [n]ew category  [s]kip")
+        # Escape brackets — Rich treats [a] as markup otherwise.
+        console.print(
+            "Actions: \\[c]onfirm  \\[p]ick another  \\[n]ew category  \\[s]kip"
+        )
         choice = typer.prompt("Choice", default="s").strip().lower()
         if choice.startswith("c"):
             ops.confirm_label(message.gmail_id, apply=True)
             console.print("[green]Confirmed.[/green]")
         elif choice.startswith("p"):
-            console.print("Active labels: " + ", ".join(active))
-            new_key = typer.prompt("New label key").strip()
+            new_key = _prompt_existing_label(
+                active, default=record.predicted_key or None
+            )
             ops.change_label(message.gmail_id, new_key, apply=True)
             console.print(f"[green]Changed to {new_key}.[/green]")
         elif choice.startswith("n"):
@@ -266,22 +288,46 @@ def _review_proposals(ops: ReviewOps) -> None:
         console.print("[dim]No pending proposals.[/dim]")
         return
     console.print(f"[bold]Proposals[/bold] ({len(proposals)})")
+    active = ops.taxonomy.active_keys()
     for view in proposals:
         p = view.proposal
         if view.message:
-            _print_message_panel(view.message.payload_json, title=f"Proposal #{p.id}")
+            _print_message_panel(
+                view.message.payload_json,
+                title=f"Proposal #{p.id} · {view.message.subject[:50]}",
+            )
         console.print(
             Panel(
-                f"suggested_key: {p.suggested_key}\n"
-                f"description: {p.description}\n"
-                f"why: {p.why_no_existing_fit}\n"
-                f"rationale: {p.rationale}",
-                title=f"Proposal #{p.id}",
+                Text(
+                    f"suggested_key: {p.suggested_key}\n"
+                    f"description: {p.description}\n"
+                    f"why: {p.why_no_existing_fit}\n"
+                    f"rationale: {p.rationale}"
+                ),
+                title=escape(f"Proposal #{p.id} details"),
+                border_style="yellow",
+                width=min(100, (console.width or 100)),
             )
         )
-        console.print("Actions: [a]pprove  [r]eject  [s]kip")
+        console.print(
+            "Actions: \\[e]xisting label  \\[a]pprove new  \\[r]eject  \\[s]kip"
+        )
         choice = typer.prompt("Choice", default="s").strip().lower()
-        if choice.startswith("a"):
+        if choice.startswith("e"):
+            # Heuristic default when rationale mentions a known label.
+            default = None
+            blob = f"{p.rationale} {p.why_no_existing_fit}".lower()
+            for key in active:
+                if key.replace("-", " ") in blob or key in blob:
+                    default = key
+                    break
+            label_key = _prompt_existing_label(active, default=default)
+            ops.assign_existing_label(p.id or 0, label_key, apply=True)
+            console.print(
+                f"[green]Assigned existing label '{label_key}' "
+                f"and closed proposal #{p.id}.[/green]"
+            )
+        elif choice.startswith("a"):
             key = typer.prompt("Key", default=p.suggested_key)
             desc = typer.prompt("Description", default=p.description)
             result = asyncio.run(
