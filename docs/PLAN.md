@@ -2,6 +2,10 @@
 
 Repo and package name: `tagsmith`. CLI entry point: `tagsmith`.
 
+> **Implemented docs for operators/contributors:** [README.md](README.md) (index), [SETUP.md](SETUP.md), [USAGE.md](USAGE.md), [DESIGN.md](DESIGN.md), [PRIVACY.md](PRIVACY.md), [CONTRIBUTING.md](CONTRIBUTING.md), [DECISIONS.md](DECISIONS.md).
+>
+> This PLAN remains the long-horizon product + learning roadmap.
+
 ## Goal
 
 A Python service that walks unread Gmail, classifies each message into a managed taxonomy (`payment-sent`, `login-detected`, ...), applies the Gmail label, and when nothing fits, files a **category proposal** for human approval. On approval the label is created in Gmail and the taxonomy grows.

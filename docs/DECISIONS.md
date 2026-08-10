@@ -2,6 +2,8 @@
 
 These are decisions, not options. Implement against them directly.
 
+For narrative architecture see [DESIGN.md](DESIGN.md). For the full roadmap see [PLAN.md](PLAN.md). Docs index: [README.md](README.md).
+
 ## Scope
 
 Phase 0 + Phase 1 in one pass. No stubs and no empty modules for later phases.
