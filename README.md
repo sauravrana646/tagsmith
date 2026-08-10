@@ -78,7 +78,7 @@ uv run pytest
 uv run ruff check src tests
 uv run ruff format --check src tests
 uv run mypy src
-uv run pip-audit
+uv run pip-audit -r <(uv export --frozen --no-emit-project --no-dev --no-hashes)
 uv run bandit -r src -ll -c pyproject.toml
 ```
 
