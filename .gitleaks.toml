@@ -1,0 +1,10 @@
+# Gitleaks configuration for Tagsmith
+title = "tagsmith"
+
+[allowlist]
+description = "Allow benign example/docs placeholders"
+paths = [
+  '''^\.env\.example$''',
+  '''^docs/.*''',
+  '''^README\.md$''',
+]
