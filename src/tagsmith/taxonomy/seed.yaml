@@ -1,0 +1,144 @@
+categories:
+  - key: payment-sent
+    description: >-
+      Money leaving the user's account, including card charges, bank debits,
+      UPI/ACH payments, and payment confirmations for purchases already made.
+    exemplars:
+      - "Payment of $42.50 to Uber was successful"
+      - "You sent ₹1,200 via UPI"
+      - "Your card ending in 1234 was charged $19.99"
+
+  - key: payment-received
+    description: >-
+      Money arriving into the user's account — incoming transfers, deposits,
+      payroll, peer payments received — not refunds of prior purchases.
+    exemplars:
+      - "You received $250 from Alex"
+      - "Direct deposit posted: Acme Corp payroll"
+      - "Incoming wire transfer credited"
+
+  - key: bill-due
+    description: >-
+      A bill or invoice that still needs payment; due dates, amount owed,
+      or payment reminders — not a receipt for a payment already made.
+    exemplars:
+      - "Your electricity bill of $88.12 is due Mar 15"
+      - "Invoice #1042 is ready — amount due $1,200"
+      - "Reminder: credit card payment due tomorrow"
+
+  - key: subscription-renewal
+    description: >-
+      Recurring subscription renewals or upcoming auto-renew notices for
+      SaaS, streaming, memberships — distinct from one-off order receipts.
+    exemplars:
+      - "Your Netflix membership renews on April 1"
+      - "GitHub Pro will renew for $4"
+      - "Spotify Premium auto-renewal receipt"
+
+  - key: security-alert
+    description: >-
+      Account security events that are not one-time codes: new sign-in,
+      suspicious activity, password changes, device added, recovery updates.
+    exemplars:
+      - "Security alert: new sign-in on Windows device"
+      - "We noticed a new login to your Google Account"
+      - "Your password was changed"
+
+  - key: otp-verification
+    description: >-
+      Short-lived one-time passwords, verification codes, or 2FA challenges
+      the user must enter now — not general security notifications.
+    exemplars:
+      - "Your verification code is 482193"
+      - "Use 739201 to sign in to GitHub"
+      - "One-time passcode for your bank login"
+
+  - key: order-confirmation
+    description: >-
+      Merchant confirmation that an order was placed successfully; includes
+      order numbers and item lists before shipment updates arrive.
+    exemplars:
+      - "Thanks for your order #112-9988776"
+      - "Order confirmed: Wireless headphones"
+      - "We've received your Amazon order"
+
+  - key: shipping-update
+    description: >-
+      Parcel logistics after an order: shipped, in transit, out for delivery,
+      delivered, delayed — not the original order confirmation.
+    exemplars:
+      - "Your package is out for delivery"
+      - "Shipped: tracking 1Z999AA10123456784"
+      - "Delivered: your item was left at the front door"
+
+  - key: travel-booking
+    description: >-
+      Flights, hotels, trains, car rentals, and itinerary confirmations or
+      changes — boarding passes and reservation vouchers included.
+    exemplars:
+      - "Your flight to SFO is confirmed"
+      - "Hotel reservation at Marriott Downtown"
+      - "boarding pass ready — UA 123"
+
+  - key: newsletter
+    description: >-
+      Recurring editorial digests the user subscribed to; content-focused
+      mail with List-Unsubscribe, not time-limited sales blasts.
+    exemplars:
+      - "This week in AI research"
+      - "Your Sunday reading list from The Atlantic"
+      - "Monthly product roundup"
+
+  - key: promotion
+    description: >-
+      Marketing offers, discounts, sales, launch campaigns, and win-back
+      mail intended to drive a purchase — not transactional receipts.
+    exemplars:
+      - "Flash sale — 40% off ends tonight"
+      - "Exclusive offer just for you"
+      - "Introducing our new spring collection"
+
+  - key: job-application
+    description: >-
+      Recruiting and job-search mail: applications received, interview
+      invites, offer updates, LinkedIn InMail about roles.
+    exemplars:
+      - "Thanks for applying to Staff Engineer"
+      - "Interview scheduled with Acme hiring team"
+      - "Your application status has been updated"
+
+  - key: support-ticket
+    description: >-
+      Customer-support thread updates, ticket IDs, agent replies, and case
+      resolutions — not marketing or security alerts.
+    exemplars:
+      - "[Ticket #45821] We've received your request"
+      - "Re: Help with billing — agent reply"
+      - "Your support case was resolved"
+
+  - key: account-statement
+    description: >-
+      Periodic account summaries and statements (bank, card, brokerage)
+      reporting balances and activity — not a single payment receipt.
+    exemplars:
+      - "Your March account statement is ready"
+      - "Monthly Chase credit card statement"
+      - "Brokerage statement available to download"
+
+  - key: tax-document
+    description: >-
+      Tax forms and filings (W-2, 1099, GST, VAT invoices marked for tax,
+      annual tax summaries) — keep distinct from ordinary statements.
+    exemplars:
+      - "Your 1099-NEC is ready"
+      - "W-2 wage and tax statement available"
+      - "Annual tax document from your broker"
+
+  - key: refund
+    description: >-
+      Money returned for a prior purchase or canceled order — refunds,
+      chargebacks credited, return confirmations with amounts restored.
+    exemplars:
+      - "Refund of $64.00 has been issued"
+      - "Your return is complete — refund processing"
+      - "Charge reversed for order #9981"

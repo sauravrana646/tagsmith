@@ -1,0 +1,49 @@
+rules:
+  - name: google-security-alert
+    label_key: security-alert
+    sender_regex: "(?i)@accounts\\.google\\.com"
+    subject_regex: "(?i)(security alert|new sign-in|new login|password.*(changed|updated))"
+
+  - name: github-security
+    label_key: security-alert
+    sender_regex: "(?i)@github\\.com"
+    subject_regex: "(?i)(\\bsecurity\\b|new.*sign-?in|unauthorized|suspicious)"
+
+  - name: github-otp
+    label_key: otp-verification
+    sender_regex: "(?i)@github\\.com"
+    subject_regex: "(?i)(verification code|one-?time|authentication code|\\bOTP\\b)"
+
+  - name: generic-otp
+    label_key: otp-verification
+    subject_regex: "(?i)(verification code|one-?time (passcode|password|code)|\\bOTP\\b|2fa code)"
+
+  - name: chase-payment-sent
+    label_key: payment-sent
+    sender_regex: "(?i)@(?:alerts\\.)?chase\\.com"
+    subject_regex: "(?i)(payment sent|you paid|charge|debit|purchase)"
+
+  - name: chase-payment-received
+    label_key: payment-received
+    sender_regex: "(?i)@(?:alerts\\.)?chase\\.com"
+    subject_regex: "(?i)(deposit|payment received|you received|credit posted)"
+
+  - name: bank-otp
+    label_key: otp-verification
+    sender_regex: "(?i)@(?:alerts\\.)?(?:chase|bankofamerica|wellsfargo|citibank)\\.com"
+    subject_regex: "(?i)(verification code|one-?time|authorization code|\\bOTP\\b)"
+
+  - name: amazon-order
+    label_key: order-confirmation
+    sender_regex: "(?i)@amazon\\.com"
+    subject_regex: "(?i)(ordered|order confirmed|thanks for your order)"
+
+  - name: amazon-shipping
+    label_key: shipping-update
+    sender_regex: "(?i)@amazon\\.(?:com|co\\.uk)"
+    subject_regex: "(?i)(shipped|out for delivery|delivered|tracking)"
+
+  - name: newsletter-list-unsub
+    label_key: newsletter
+    require_list_unsubscribe: true
+    subject_regex: "(?i)(digest|newsletter|weekly|roundup|this week)"
