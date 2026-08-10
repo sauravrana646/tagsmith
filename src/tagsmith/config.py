@@ -4,12 +4,17 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from dotenv import load_dotenv
 from platformdirs import user_config_dir, user_data_dir
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 APP_NAME = "tagsmith"
 PROMPT_VERSION = "v1"
+
+# Load .env into os.environ so provider keys (OPENROUTER_API_KEY, OPENAI_API_KEY,
+# GOOGLE_API_KEY, …) are visible to Pydantic AI. Settings alone only consume TAGSMITH_*.
+load_dotenv(override=False)
 
 
 def default_config_dir() -> Path:
