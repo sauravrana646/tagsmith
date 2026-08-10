@@ -37,7 +37,7 @@ Later phases (evals, RAG, continuous sync/MCP, product) are planned — see [doc
 - `tagsmith review` for held mail, medium-confidence confirm/change, and new-category proposals
 - Numeric existing-label picker; LLM `proposed_new` shown when nothing fits
 - Idempotent sync; `--reprocess` escape hatch; negative examples if you remove an agent label
-- Offline tests + CI (lint, types, tests, secrets, dependency audit, Bandit)
+- Offline tests + CI (lint, types, tests, Gitleaks secret scan, dependency audit, Bandit) with a `quality-gate` merge check
 
 ---
 

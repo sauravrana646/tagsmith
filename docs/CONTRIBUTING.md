@@ -29,13 +29,45 @@ uv run bandit -r src -ll -c pyproject.toml
 
 PRs and pushes to `main` run `.github/workflows/ci.yml`:
 
-- Ruff lint + format
-- Mypy
-- Pytest (3.11, 3.12)
-- Gitleaks (secrets)
-- pip-audit
-- Bandit
-- Guard against tracked credential filenames
+| Job | What it checks |
+| --- | --- |
+| `secret-scan` | Gitleaks + credential filename guard (runs first) |
+| `lint-test` | Ruff, Mypy, Pytest (3.11 / 3.12) |
+| `security` | pip-audit + Bandit |
+| `quality-gate` | Aggregates the above; **this** is the merge gate |
+
+### Secret detection: Gitleaks vs GitGuardian
+
+**Use Gitleaks as the required merge gate.** Keep GitGuardian optional for monitoring.
+
+| | Gitleaks | GitGuardian |
+| --- | --- | --- |
+| Cost for CI gate | Free / OSS | Paid for reliable org policies |
+| Runs in our workflow | Yes (`gitleaks-action` + `.gitleaks.toml`) | GitHub App / SaaS (outside our YAML) |
+| Can be a required check | Yes — fails `secret-scan` → fails `quality-gate` | Only if the App check is required separately |
+| Offline / local | `gitleaks detect` locally | Needs cloud API |
+| Strength | Deterministic, repo-owned config, PR annotations | Historical digests, multi-repo dashboards, incident workflow |
+
+Recommendation for Tagsmith:
+
+1. **Required:** Gitleaks in CI (`secret-scan` job) → blocks via `quality-gate`.
+2. **Optional:** GitGuardian GitHub App for inbox/alerts (nice to have; do **not** rely on it alone to block merges).
+3. **Also enable** on GitHub: Settings → Code security → **Secret scanning** + **Push protection** (native GitHub, complementary).
+
+Do not treat GitGuardian as a substitute for Gitleaks here: App checks can be flaky/skipped on forks, and we cannot version-control their rules next to the code the way we do `.gitleaks.toml`.
+
+### Require the quality gate on `main` (branch protection)
+
+CI alone does not block merges until branch protection requires the check. A repo admin must:
+
+1. GitHub → **Settings** → **Branches** → **Add/Edit branch protection rule** for `main`.
+2. Enable **Require a pull request before merging**.
+3. Enable **Require status checks to pass before merging**.
+4. Search and select **`quality-gate`** (and optionally also `secret-scan` if you want it listed separately).
+5. Prefer **Do not allow bypassing the above settings** for admins on a solo/small repo if you want the gate to always apply.
+6. Optionally enable **Require branches to be up to date before merging**.
+
+Until that rule exists, a red `quality-gate` is advisory only. After the first CI run on this workflow, the `quality-gate` check name appears in the status-check picker.
 
 ## Project conventions
 
@@ -56,8 +88,9 @@ PRs and pushes to `main` run `.github/workflows/ci.yml`:
 
 - Target `main`.
 - Keep PRs focused; update docs when behavior or UX changes (`docs/USAGE.md`, `DESIGN.md`, `DECISIONS.md` as appropriate).
-- Ensure CI is green.
+- Ensure CI is green — especially **`quality-gate`** (includes Gitleaks).
 - Never commit `.env`, OAuth client JSON, tokens, or mailbox databases.
+- Run `gitleaks detect --source . -v` locally if you have the CLI installed before opening a PR.
 
 ## Useful docs
 
