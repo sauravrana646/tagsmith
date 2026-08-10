@@ -37,8 +37,7 @@ def test_thresholds() -> None:
     )
     assert route_classification(high, apply_threshold=0.75, review_threshold=0.5) == "apply"
     assert (
-        route_classification(mid, apply_threshold=0.75, review_threshold=0.5)
-        == "apply_with_review"
+        route_classification(mid, apply_threshold=0.75, review_threshold=0.5) == "apply_with_review"
     )
     assert route_classification(low, apply_threshold=0.75, review_threshold=0.5) == "hold_propose"
 

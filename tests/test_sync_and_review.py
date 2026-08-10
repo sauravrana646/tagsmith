@@ -52,9 +52,7 @@ async def test_sync_apply_and_skip_prior(session, settings: Settings, fake_gmail
 
 
 @pytest.mark.asyncio
-async def test_user_removed_label_becomes_negative(
-    session, settings: Settings, fake_gmail
-) -> None:
+async def test_user_removed_label_becomes_negative(session, settings: Settings, fake_gmail) -> None:
     fake_gmail.messages = {"msg_payment_1": dict(PAYMENT_ALERT)}
     service = SyncService(session, fake_gmail, settings)
     await service.sync(limit=10, apply=True)
@@ -121,9 +119,7 @@ async def test_llm_medium_band_and_confirm(session, settings: Settings, fake_gma
 
 
 @pytest.mark.asyncio
-async def test_approve_proposal_requeues_held(
-    session, settings: Settings, fake_gmail
-) -> None:
+async def test_approve_proposal_requeues_held(session, settings: Settings, fake_gmail) -> None:
     from tagsmith.classify import pipeline as pipeline_mod
 
     async def propose_new(email, **kwargs):  # type: ignore[no-untyped-def]
@@ -264,4 +260,3 @@ async def test_assign_existing_label_closes_proposal(
     assert msg.applied_label_key == "promotion"
     assert msg.applied_label_id is not None
     assert any(msg.applied_label_id in call["add"] for call in fake_gmail.modify_calls)
-

@@ -46,7 +46,13 @@ dev = [
   "ruff>=0.8.0",
   "mypy>=1.13.0",
   "types-PyYAML>=6.0.12",
+  "pip-audit>=2.7.0",
+  "bandit>=1.8.0",
 ]
+
+[tool.bandit]
+exclude_dirs = ["tests", ".venv"]
+skips = ["B101"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

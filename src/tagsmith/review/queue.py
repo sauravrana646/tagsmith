@@ -92,7 +92,6 @@ class ReviewService:
             out.append((message, record))
         return out
 
-
     def enqueue_proposal(
         self,
         *,

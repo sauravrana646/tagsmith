@@ -158,9 +158,7 @@ def sync(
     with get_session(settings) as session:
         service = SyncService(session, gmail, settings)
         try:
-            result = asyncio.run(
-                service.sync(limit=limit, apply=apply, reprocess=reprocess)
-            )
+            result = asyncio.run(service.sync(limit=limit, apply=apply, reprocess=reprocess))
         except Exception as exc:
             console.print(f"[red]sync failed: {exc}[/red]")
             raise typer.Exit(1) from exc
@@ -254,9 +252,7 @@ def _prompt_existing_label(active: list[str], *, default: str | None = None) -> 
             number = int(raw)
             if 1 <= number <= len(active):
                 return active[number - 1]
-            console.print(
-                f"[red]Number out of range. Enter 1-{len(active)}.[/red]"
-            )
+            console.print(f"[red]Number out of range. Enter 1-{len(active)}.[/red]")
             continue
         if raw in active:
             return raw
@@ -275,21 +271,16 @@ def _review_needs_review(ops: ReviewOps) -> None:
     for message, record in items:
         _print_message_panel(
             message.payload_json,
-            title=f"{message.gmail_id} · predicted={record.predicted_key} "
-            f"conf={record.confidence}",
+            title=f"{message.gmail_id} · predicted={record.predicted_key} conf={record.confidence}",
         )
         # Escape brackets — Rich treats [a] as markup otherwise.
-        console.print(
-            "Actions: \\[c]onfirm  \\[p]ick another  \\[n]ew category  \\[s]kip"
-        )
+        console.print("Actions: \\[c]onfirm  \\[p]ick another  \\[n]ew category  \\[s]kip")
         choice = typer.prompt("Choice", default="s").strip().lower()
         if choice.startswith("c"):
             ops.confirm_label(message.gmail_id, apply=True)
             console.print("[green]Confirmed.[/green]")
         elif choice.startswith("p"):
-            new_key = _prompt_existing_label(
-                active, default=record.predicted_key or None
-            )
+            new_key = _prompt_existing_label(active, default=record.predicted_key or None)
             ops.change_label(message.gmail_id, new_key, apply=True)
             console.print(f"[green]Changed to {new_key}.[/green]")
         elif choice.startswith("n"):
@@ -303,8 +294,7 @@ def _review_needs_review(ops: ReviewOps) -> None:
                 why=why,
             )
             console.print(
-                f"[yellow]Queued proposal #{proposal.id} "
-                f"{proposal.suggested_key}[/yellow]"
+                f"[yellow]Queued proposal #{proposal.id} {proposal.suggested_key}[/yellow]"
             )
         else:
             console.print("[dim]Skipped.[/dim]")
@@ -316,9 +306,7 @@ def _review_held(ops: ReviewOps) -> None:
         console.print("[dim]No held messages.[/dim]")
         return
     console.print(f"[bold]Held / needs decision[/bold] ({len(items)})")
-    console.print(
-        "[dim]These have AI/needs-review in Gmail but no confident category yet.[/dim]"
-    )
+    console.print("[dim]These have AI/needs-review in Gmail but no confident category yet.[/dim]")
     active = ops.taxonomy.active_keys()
     for message, record in items:
         predicted = record.predicted_key if record else None
@@ -359,9 +347,7 @@ def _review_held(ops: ReviewOps) -> None:
                 )
             )
         elif suggestion is None:
-            console.print(
-                "[dim]No existing-label suggestion and no LLM proposed_new stored.[/dim]"
-            )
+            console.print("[dim]No existing-label suggestion and no LLM proposed_new stored.[/dim]")
 
         console.print("Actions: \\[e]xisting label  \\[n]ew category  \\[s]kip")
         # Prefer existing when cues are strong; otherwise lean on LLM proposed_new.
@@ -425,9 +411,7 @@ def _review_proposals(ops: ReviewOps) -> None:
                 width=min(100, (console.width or 100)),
             )
         )
-        console.print(
-            "Actions: \\[e]xisting label  \\[a]pprove new  \\[r]eject  \\[s]kip"
-        )
+        console.print("Actions: \\[e]xisting label  \\[a]pprove new  \\[r]eject  \\[s]kip")
         choice = typer.prompt("Choice", default="s").strip().lower()
         if choice.startswith("e"):
             # Heuristic default when rationale mentions a known label.
@@ -440,8 +424,7 @@ def _review_proposals(ops: ReviewOps) -> None:
             label_key = _prompt_existing_label(active, default=default)
             ops.assign_existing_label(p.id or 0, label_key, apply=True)
             console.print(
-                f"[green]Assigned existing label '{label_key}' "
-                f"and closed proposal #{p.id}.[/green]"
+                f"[green]Assigned existing label '{label_key}' and closed proposal #{p.id}.[/green]"
             )
         elif choice.startswith("a"):
             key = typer.prompt("Key", default=p.suggested_key)
@@ -454,9 +437,7 @@ def _review_proposals(ops: ReviewOps) -> None:
                     description_override=desc if desc != p.description else None,
                 )
             )
-            console.print(
-                f"[green]Approved.[/green] Reclassified held: {result.counts.as_dict()}"
-            )
+            console.print(f"[green]Approved.[/green] Reclassified held: {result.counts.as_dict()}")
         elif choice.startswith("r"):
             ops.reject_proposal(p.id or 0)
             console.print("[yellow]Rejected.[/yellow]")
@@ -478,9 +459,7 @@ def review_list() -> None:
         props = queue.list_pending_proposals()
         needs = queue.list_needs_review()
         held = queue.list_held()
-    console.print(
-        f"Proposals: {len(props)} | Needs review: {len(needs)} | Held: {len(held)}"
-    )
+    console.print(f"Proposals: {len(props)} | Needs review: {len(needs)} | Held: {len(held)}")
     for p in props:
         console.print(f"  proposal #{p.id} {p.suggested_key} ← {p.gmail_id}")
     for message, need_record in needs:
@@ -490,9 +469,7 @@ def review_list() -> None:
         )
     for message, held_record in held:
         predicted = held_record.predicted_key if held_record else None
-        console.print(
-            f"  held {message.gmail_id} predicted={predicted} · {message.subject[:60]}"
-        )
+        console.print(f"  held {message.gmail_id} predicted={predicted} · {message.subject[:60]}")
 
 
 def run() -> None:

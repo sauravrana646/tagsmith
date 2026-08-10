@@ -73,10 +73,16 @@ uv run tagsmith taxonomy list
 Tests use a fake Gmail gateway and recorded fixtures — no credentials required.
 
 ```bash
+uv sync --group dev
 uv run pytest
 uv run ruff check src tests
+uv run ruff format --check src tests
 uv run mypy src
+uv run pip-audit
+uv run bandit -r src -ll -c pyproject.toml
 ```
+
+CI runs the same checks on pull requests to `main` (lint, types, tests, secret scan, dependency audit, Bandit).
 
 ## Privacy notes
 

@@ -70,8 +70,8 @@ class TaxonomyRegistry:
         return created
 
     def list_active(self) -> list[Category]:
-        stmt = select(Category).where(Category.status == CategoryStatus.ACTIVE).order_by(
-            Category.key
+        stmt = (
+            select(Category).where(Category.status == CategoryStatus.ACTIVE).order_by(Category.key)
         )
         return list(self.session.exec(stmt).all())
 

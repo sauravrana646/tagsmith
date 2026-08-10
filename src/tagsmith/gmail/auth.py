@@ -65,6 +65,4 @@ def get_credentials(settings: Settings, *, interactive: bool = False) -> Credent
         return creds
     if interactive:
         return run_auth_flow(settings)
-    raise AuthError(
-        "Not authenticated. Run `tagsmith auth` after placing your OAuth client JSON."
-    )
+    raise AuthError("Not authenticated. Run `tagsmith auth` after placing your OAuth client JSON.")

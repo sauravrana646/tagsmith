@@ -70,8 +70,7 @@ def build_classification_model(label_keys: list[str]) -> type[BaseModel]:
         def require_proposal_when_no_label(self) -> DynamicClassification:
             if self.label_key is None and self.proposed_new is None:
                 raise ValueError(
-                    "proposed_new is required when label_key is null "
-                    "(no existing label fit)"
+                    "proposed_new is required when label_key is null (no existing label fit)"
                 )
             return self
 

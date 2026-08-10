@@ -185,9 +185,7 @@ class SyncService:
             if label_id:
                 add_ids.append(label_id)
         if needs_review and apply:
-            review_label = self.gmail.get_or_create_label(
-                self.settings.needs_review_label_name
-            )
+            review_label = self.gmail.get_or_create_label(self.settings.needs_review_label_name)
             rid = str(review_label.get("id") or "")
             if rid:
                 add_ids.append(rid)
@@ -252,11 +250,7 @@ class SyncService:
         )
         classification = result.classification
         route = result.route
-        source = (
-            ClassificationSource.RULE
-            if result.source == "rule"
-            else ClassificationSource.LLM
-        )
+        source = ClassificationSource.RULE if result.source == "rule" else ClassificationSource.LLM
 
         needs_review = route == "apply_with_review"
         hold = route == "hold_propose"

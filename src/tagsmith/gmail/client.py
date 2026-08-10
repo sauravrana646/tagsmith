@@ -115,9 +115,7 @@ class GmailClient:
         emails: list[NormalizedEmail] = []
         for gmail_id in ids:
             raw = self.get_message(gmail_id)
-            emails.append(
-                normalize_message(raw, body_char_limit=self.settings.body_char_limit)
-            )
+            emails.append(normalize_message(raw, body_char_limit=self.settings.body_char_limit))
         return emails
 
     def modify_labels(

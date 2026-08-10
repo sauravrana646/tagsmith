@@ -173,9 +173,7 @@ class ReviewOps:
             review_id = self._needs_review_label_id()
             if review_id:
                 remove_ids.append(review_id)
-            label = self.gmail.get_or_create_label(
-                self.settings.gmail_label_name(suggested_key)
-            )
+            label = self.gmail.get_or_create_label(self.settings.gmail_label_name(suggested_key))
             label_id = str(label.get("id") or "")
             self.gmail.modify_labels(
                 gmail_id,
