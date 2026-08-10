@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
@@ -284,31 +285,26 @@ class SyncService:
         if hold:
             message.state = MessageState.HELD
             counts.held += 1
-            if classification.proposed_new is not None:
-                proposal = self.reviews.enqueue_proposal(
-                    gmail_id=email.gmail_id,
-                    suggested_key=classification.proposed_new.suggested_key,
-                    description=classification.proposed_new.description,
-                    rationale=classification.rationale,
-                    why_no_existing_fit=classification.proposed_new.why_no_existing_fit,
-                )
-                if proposal is not None:
-                    counts.proposals += 1
-            elif classification.label_key is None:
-                # Model returned no fit without proposal — synthesize a soft proposal key.
-                soft = NewCategory(
-                    suggested_key="uncategorized-followup",
-                    description=(
-                        "Email that did not fit the active taxonomy; human should rename."
-                    ),
+            proposed = classification.proposed_new
+            if proposed is None and classification.label_key is None:
+                # Last-resort only if the model ignored the schema (should be rare).
+                slug = re.sub(r"[^a-z0-9]+", "-", email.subject.lower()).strip("-")
+                slug = "-".join(slug.split("-")[:4]) or "needs-human-name"
+                if slug in {"uncategorized-followup", "unknown", "other", "misc"}:
+                    slug = "needs-human-name"
+                proposed = NewCategory(
+                    suggested_key=slug,
+                    description=f"Human should refine category for: {email.subject[:80]}",
                     why_no_existing_fit=classification.rationale,
                 )
+                classification = classification.model_copy(update={"proposed_new": proposed})
+            if proposed is not None:
                 proposal = self.reviews.enqueue_proposal(
                     gmail_id=email.gmail_id,
-                    suggested_key=soft.suggested_key,
-                    description=soft.description,
+                    suggested_key=proposed.suggested_key,
+                    description=proposed.description,
                     rationale=classification.rationale,
-                    why_no_existing_fit=soft.why_no_existing_fit,
+                    why_no_existing_fit=proposed.why_no_existing_fit,
                 )
                 if proposal is not None:
                     counts.proposals += 1
@@ -328,6 +324,7 @@ class SyncService:
             message.applied_label_id = applied_label_id
         message.updated_at = utcnow()
 
+        proposed = classification.proposed_new
         record = ClassificationRecord(
             gmail_id=email.gmail_id,
             label_key=label_key,
@@ -335,6 +332,9 @@ class SyncService:
             final_key=None if needs_review or hold else label_key,
             confidence=classification.confidence,
             rationale=classification.rationale,
+            proposed_key=proposed.suggested_key if proposed else None,
+            proposed_description=proposed.description if proposed else None,
+            proposed_why=proposed.why_no_existing_fit if proposed else None,
             source=source,
             model=None if source == ClassificationSource.RULE else self.settings.llm_model,
             prompt_version=None if source == ClassificationSource.RULE else PROMPT_VERSION,

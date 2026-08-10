@@ -89,6 +89,10 @@ class ClassificationRecord(SQLModel, table=True):
     # NULL for rule hits — must not contaminate confidence calibration.
     confidence: float | None = Field(default=None)
     rationale: str = ""
+    # LLM proposed_new payload when no existing label was confidently chosen.
+    proposed_key: str | None = Field(default=None, index=True)
+    proposed_description: str | None = None
+    proposed_why: str | None = None
     source: ClassificationSource
     model: str | None = None
     prompt_version: str | None = None

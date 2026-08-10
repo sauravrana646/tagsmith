@@ -144,6 +144,9 @@ async def test_approve_proposal_requeues_held(
     result = await service.sync(limit=5, apply=True)
     assert result.counts.held == 1
     assert result.counts.proposals == 1
+    held_record = session.exec(select(ClassificationRecord)).first()
+    assert held_record is not None
+    assert held_record.proposed_key == "insurance-renewal"
 
     ops = ReviewOps(session, fake_gmail, settings)
     proposals = ops.list_proposals()
@@ -184,8 +187,8 @@ async def test_held_messages_appear_and_can_be_filed(
             confidence=0.9,
             rationale="Does not fit; maybe promotion though.",
             proposed_new=NewCategory(
-                suggested_key="uncategorized-followup",
-                description="fallback",
+                suggested_key="product-upsell",
+                description="Product feature upsell and quota upgrade mail.",
                 why_no_existing_fit="none",
             ),
         )
@@ -231,8 +234,8 @@ async def test_assign_existing_label_closes_proposal(
             confidence=0.9,
             rationale="OpenAI upsell; fits promotion.",
             proposed_new=NewCategory(
-                suggested_key="uncategorized-followup",
-                description="Email that did not fit; human should rename.",
+                suggested_key="product-upsell",
+                description="Product feature upsell and quota upgrade mail.",
                 why_no_existing_fit="fallback",
             ),
         )

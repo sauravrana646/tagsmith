@@ -26,9 +26,15 @@ Rules:
 - Do NOT set label_key to null if your rationale describes an existing category.
   Example: if the email is a completed purchase debit / "was paid" confirmation,
   label_key must be payment-sent, not null.
-- Set label_key to null ONLY when no existing label is a reasonable fit. Then you
-  MUST fill proposed_new with a kebab-case key, a one-line disambiguation
-  description, and why existing labels fail.
+- If no existing label is a reasonable fit, set label_key to null AND you MUST fill
+  proposed_new with:
+    - suggested_key: specific kebab-case category (never placeholders like
+      uncategorized-followup / other / unknown)
+    - description: one-line disambiguation instruction for future prompts
+    - why_no_existing_fit: why the closed set fails
+- If you pick an existing label_key but confidence is below 0.5 (guessy), still set
+  that label_key as your best guess AND also fill proposed_new with a better new
+  category alternative for the human reviewer.
 - confidence is coarse triage from 0 to 1, not a calibrated probability.
 - rationale must be one sentence and must name the chosen label_key when set.
 - Prefer transactional meaning over marketing tone when both appear.

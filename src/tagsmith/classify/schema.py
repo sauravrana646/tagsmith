@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, create_model, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 KEBAB_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 
@@ -23,6 +23,8 @@ class NewCategory(BaseModel):
         value = value.strip().lower().replace("_", "-").replace(" ", "-")
         if not KEBAB_RE.match(value):
             raise ValueError("suggested_key must be kebab-case")
+        if value in {"uncategorized-followup", "unknown", "other", "misc"}:
+            raise ValueError("suggested_key must be a specific category, not a placeholder")
         return value
 
 
@@ -33,6 +35,14 @@ class Classification(BaseModel):
     confidence: float | None = Field(default=None, ge=0.0, le=1.0)
     rationale: str
     proposed_new: NewCategory | None = None
+
+    @model_validator(mode="after")
+    def require_proposal_when_no_label(self) -> Classification:
+        if self.label_key is None and self.proposed_new is None:
+            raise ValueError(
+                "proposed_new is required when label_key is null (no existing label fit)"
+            )
+        return self
 
 
 class LabeledEmail(BaseModel):
@@ -49,14 +59,24 @@ def build_classification_model(label_keys: list[str]) -> type[BaseModel]:
     if not label_keys:
         raise ValueError("label_keys must be non-empty")
     label_literal = Literal.__getitem__(tuple([*sorted(label_keys), None]))
-    return create_model(
-        "DynamicClassification",
-        label_key=(label_literal, Field(default=None)),
-        confidence=(float, Field(ge=0.0, le=1.0)),
-        rationale=(str, ...),
-        proposed_new=(NewCategory | None, None),
-        __base__=BaseModel,
-    )
+
+    class DynamicClassification(BaseModel):
+        label_key: label_literal | None = None  # type: ignore[valid-type]
+        confidence: float = Field(ge=0.0, le=1.0)
+        rationale: str
+        proposed_new: NewCategory | None = None
+
+        @model_validator(mode="after")
+        def require_proposal_when_no_label(self) -> DynamicClassification:
+            if self.label_key is None and self.proposed_new is None:
+                raise ValueError(
+                    "proposed_new is required when label_key is null "
+                    "(no existing label fit)"
+                )
+            return self
+
+    DynamicClassification.__name__ = "DynamicClassification"
+    return DynamicClassification
 
 
 def to_classification(result: BaseModel | Classification | dict[str, Any]) -> Classification:

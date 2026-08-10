@@ -325,6 +325,9 @@ def _review_held(ops: ReviewOps) -> None:
         conf = record.confidence if record else None
         rationale = record.rationale if record else ""
         body = str((message.payload_json or {}).get("body_text") or "")
+        proposed_key = record.proposed_key if record else None
+        proposed_description = record.proposed_description if record else None
+        proposed_why = record.proposed_why if record else None
         suggestion = suggest_existing_label(
             active_keys=active,
             subject=message.subject,
@@ -342,32 +345,51 @@ def _review_held(ops: ReviewOps) -> None:
                 f"[bold green]Suggested existing label:[/bold green] "
                 f"{suggestion.label_key}  [dim]({suggestion.reason})[/dim]"
             )
-        else:
-            console.print("[dim]No existing-label suggestion from subject/rationale.[/dim]")
+        if proposed_key:
+            console.print(
+                Panel(
+                    Text(
+                        f"suggested_key: {proposed_key}\n"
+                        f"description: {proposed_description or ''}\n"
+                        f"why: {proposed_why or ''}"
+                    ),
+                    title="LLM proposed new category",
+                    border_style="yellow",
+                    width=min(100, (console.width or 100)),
+                )
+            )
+        elif suggestion is None:
+            console.print(
+                "[dim]No existing-label suggestion and no LLM proposed_new stored.[/dim]"
+            )
+
         console.print("Actions: \\[e]xisting label  \\[n]ew category  \\[s]kip")
-        default_choice = "e" if suggestion is not None else "s"
+        # Prefer existing when cues are strong; otherwise lean on LLM proposed_new.
+        if suggestion is not None:
+            default_choice = "e"
+        elif proposed_key:
+            default_choice = "n"
+        else:
+            default_choice = "s"
         choice = typer.prompt("Choice", default=default_choice).strip().lower()
         if choice.startswith("e"):
-            default = suggestion.label_key if suggestion else None
-            if default is None:
-                blob = (rationale or "").lower()
-                for key in active:
-                    if key.replace("-", " ") in blob or key in blob:
-                        default = key
-                        break
+            default = suggestion.label_key if suggestion else predicted
             label_key = _prompt_existing_label(active, default=default)
             ops.resolve_held_with_existing(message.gmail_id, label_key, apply=True)
             console.print(f"[green]Filed under '{label_key}'.[/green]")
             active = ops.taxonomy.active_keys()
         elif choice.startswith("n"):
-            suggested = typer.prompt("New key (kebab-case)")
-            description = typer.prompt("One-line description")
-            why = typer.prompt("Why no existing fit")
+            suggested = typer.prompt("New key (kebab-case)", default=proposed_key or "")
+            description = typer.prompt(
+                "One-line description",
+                default=proposed_description or "",
+            )
+            why = typer.prompt("Why no existing fit", default=proposed_why or "")
             ops.resolve_held_with_new(
                 message.gmail_id,
-                suggested_key=suggested,
-                description=description,
-                why=why,
+                suggested_key=str(suggested).strip(),
+                description=str(description).strip(),
+                why=str(why).strip(),
                 apply=True,
             )
             console.print(f"[green]Created and applied '{suggested}'.[/green]")
