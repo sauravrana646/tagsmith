@@ -33,14 +33,23 @@ rules:
     sender_regex: "(?i)@(?:alerts\\.)?(?:chase|bankofamerica|wellsfargo|citibank)\\.com"
     subject_regex: "(?i)(verification code|one-?time|authorization code|\\bOTP\\b)"
 
+  - name: amazon-pay-payment-sent
+    label_key: payment-sent
+    sender_regex: "(?i)@(?:amazonpay\\.in|amazon\\.in|payments\\.amazon\\.)"
+    subject_regex: "(?i)(was paid|payment (was )?successful|you paid|debited)"
+
+  - name: generic-payment-sent-subject
+    label_key: payment-sent
+    subject_regex: "(?i)(\\bRs\\.?\\s*\\d|\\$\\d+|₹\\s*\\d).*(was paid|paid on)|\\byou paid\\b"
+
   - name: amazon-order
     label_key: order-confirmation
-    sender_regex: "(?i)@amazon\\.com"
+    sender_regex: "(?i)@amazon\\.(?:com|in)"
     subject_regex: "(?i)(ordered|order confirmed|thanks for your order)"
 
   - name: amazon-shipping
     label_key: shipping-update
-    sender_regex: "(?i)@amazon\\.(?:com|co\\.uk)"
+    sender_regex: "(?i)@amazon\\.(?:com|co\\.uk|in)"
     subject_regex: "(?i)(shipped|out for delivery|delivered|tracking)"
 
   - name: newsletter-list-unsub

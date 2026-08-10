@@ -30,6 +30,26 @@ def test_security_and_otp_rules(settings, session) -> None:
     assert news is not None and news.label_key == "newsletter"
 
 
+def test_amazon_pay_payment_rule(settings, session) -> None:
+    from tests.fixtures.messages import _msg
+
+    keys = {c.key for c in load_seed_categories()}
+    rules = load_rules(settings.rules_path, keys)
+    raw = _msg(
+        gmail_id="msg_amz_pay",
+        thread_id="thr_amz_pay",
+        sender="Amazon Pay India <no-reply@amazonpay.in>",
+        to="user@example.com",
+        subject="Rs 229.00 was paid on Amazon.in",
+        date="Mon, 10 Mar 2025 09:15:00 +0000",
+        body_plain="Thanks for using Amazon Pay Balance. Your payment was successful.",
+    )
+    hit = match_rules(normalize_message(raw), rules)
+    assert hit is not None
+    assert hit.label_key == "payment-sent"
+    assert hit.confidence is None
+
+
 def test_stale_rule_fails_loudly(settings, tmp_path) -> None:
     path = tmp_path / "rules.yaml"
     path.write_text(

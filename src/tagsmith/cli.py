@@ -18,6 +18,7 @@ from tagsmith.gmail.auth import AuthError, run_auth_flow
 from tagsmith.gmail.client import GmailClient
 from tagsmith.gmail.parser import normalize_message
 from tagsmith.review.display import format_message_for_review
+from tagsmith.review.suggest import suggest_existing_label
 from tagsmith.services.review_ops import ReviewOps
 from tagsmith.services.sync import SyncService
 from tagsmith.taxonomy.registry import TaxonomyRegistry
@@ -323,25 +324,40 @@ def _review_held(ops: ReviewOps) -> None:
         predicted = record.predicted_key if record else None
         conf = record.confidence if record else None
         rationale = record.rationale if record else ""
+        body = str((message.payload_json or {}).get("body_text") or "")
+        suggestion = suggest_existing_label(
+            active_keys=active,
+            subject=message.subject,
+            rationale=rationale or "",
+            body=body,
+        )
         _print_message_panel(
             message.payload_json,
             title=f"held {message.gmail_id} · predicted={predicted} conf={conf}",
         )
         if rationale:
             console.print(Panel(Text(rationale), title="model rationale", border_style="dim"))
+        if suggestion is not None:
+            console.print(
+                f"[bold green]Suggested existing label:[/bold green] "
+                f"{suggestion.label_key}  [dim]({suggestion.reason})[/dim]"
+            )
+        else:
+            console.print("[dim]No existing-label suggestion from subject/rationale.[/dim]")
         console.print("Actions: \\[e]xisting label  \\[n]ew category  \\[s]kip")
-        choice = typer.prompt("Choice", default="s").strip().lower()
+        default_choice = "e" if suggestion is not None else "s"
+        choice = typer.prompt("Choice", default=default_choice).strip().lower()
         if choice.startswith("e"):
-            default = None
-            blob = (rationale or "").lower()
-            for key in active:
-                if key.replace("-", " ") in blob or key in blob:
-                    default = key
-                    break
+            default = suggestion.label_key if suggestion else None
+            if default is None:
+                blob = (rationale or "").lower()
+                for key in active:
+                    if key.replace("-", " ") in blob or key in blob:
+                        default = key
+                        break
             label_key = _prompt_existing_label(active, default=default)
             ops.resolve_held_with_existing(message.gmail_id, label_key, apply=True)
             console.print(f"[green]Filed under '{label_key}'.[/green]")
-            # Refresh active keys in case user somehow activated during session.
             active = ops.taxonomy.active_keys()
         elif choice.startswith("n"):
             suggested = typer.prompt("New key (kebab-case)")

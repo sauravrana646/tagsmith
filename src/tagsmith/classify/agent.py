@@ -22,11 +22,15 @@ log = get_logger(__name__)
 SYSTEM_PROMPT = """You classify a single email into exactly one taxonomy label.
 
 Rules:
-- Choose label_key from the provided closed set when one fits.
-- If none fit, set label_key to null and fill proposed_new with a kebab-case key,
-  a one-line disambiguation description, and why existing labels fail.
+- Choose label_key from the provided closed set whenever one fits — even partially.
+- Do NOT set label_key to null if your rationale describes an existing category.
+  Example: if the email is a completed purchase debit / "was paid" confirmation,
+  label_key must be payment-sent, not null.
+- Set label_key to null ONLY when no existing label is a reasonable fit. Then you
+  MUST fill proposed_new with a kebab-case key, a one-line disambiguation
+  description, and why existing labels fail.
 - confidence is coarse triage from 0 to 1, not a calibrated probability.
-- rationale must be one sentence.
+- rationale must be one sentence and must name the chosen label_key when set.
 - Prefer transactional meaning over marketing tone when both appear.
 - List-Unsubscribe strongly suggests newsletter or promotion; use subject/body to pick.
 """
