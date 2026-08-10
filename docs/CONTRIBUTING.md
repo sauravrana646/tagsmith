@@ -27,7 +27,7 @@ uv run bandit -r src -ll -c pyproject.toml
 
 ### CI
 
-PRs and pushes to `main` run `.github/workflows/ci.yml`:
+Pull requests targeting `main` run `.github/workflows/ci.yml` (no push-to-`main` workflow runs):
 
 | Job | What it checks |
 | --- | --- |
