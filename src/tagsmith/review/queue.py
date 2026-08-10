@@ -68,6 +68,30 @@ class ReviewService:
                 out.append((message, record))
         return out
 
+    def list_held(self) -> list[tuple[Message, ClassificationRecord | None]]:
+        """Messages held for no-fit / proposal — includes those without a pending proposal.
+
+        Sync applies the Gmail AI/needs-review label to holds for visibility, but they
+        live in MessageState.HELD (not NEEDS_REVIEW). Proposal dedupe can also collapse
+        several holds into one proposal; this list is per-message so none are orphaned.
+        """
+        messages = list(
+            self.session.exec(
+                select(Message)
+                .where(Message.state == MessageState.HELD)
+                .order_by(col(Message.received_at))
+            ).all()
+        )
+        out: list[tuple[Message, ClassificationRecord | None]] = []
+        for message in messages:
+            record = self.session.exec(
+                select(ClassificationRecord)
+                .where(ClassificationRecord.gmail_id == message.gmail_id)
+                .order_by(col(ClassificationRecord.created_at).desc())
+            ).first()
+            out.append((message, record))
+        return out
+
 
     def enqueue_proposal(
         self,

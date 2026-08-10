@@ -209,6 +209,7 @@ def review_root(ctx: typer.Context) -> None:
     with get_session(settings) as session:
         ops = ReviewOps(session, gmail, settings)
         _review_needs_review(ops)
+        _review_held(ops)
         _review_proposals(ops)
 
 
@@ -278,6 +279,57 @@ def _review_needs_review(ops: ReviewOps) -> None:
                 f"[yellow]Queued proposal #{proposal.id} "
                 f"{proposal.suggested_key}[/yellow]"
             )
+        else:
+            console.print("[dim]Skipped.[/dim]")
+
+
+def _review_held(ops: ReviewOps) -> None:
+    items = ops.list_held()
+    if not items:
+        console.print("[dim]No held messages.[/dim]")
+        return
+    console.print(f"[bold]Held / needs decision[/bold] ({len(items)})")
+    console.print(
+        "[dim]These have AI/needs-review in Gmail but no confident category yet.[/dim]"
+    )
+    active = ops.taxonomy.active_keys()
+    for message, record in items:
+        predicted = record.predicted_key if record else None
+        conf = record.confidence if record else None
+        rationale = record.rationale if record else ""
+        _print_message_panel(
+            message.payload_json,
+            title=f"held {message.gmail_id} · predicted={predicted} conf={conf}",
+        )
+        if rationale:
+            console.print(Panel(Text(rationale), title="model rationale", border_style="dim"))
+        console.print("Actions: \\[e]xisting label  \\[n]ew category  \\[s]kip")
+        choice = typer.prompt("Choice", default="s").strip().lower()
+        if choice.startswith("e"):
+            default = None
+            blob = (rationale or "").lower()
+            for key in active:
+                if key.replace("-", " ") in blob or key in blob:
+                    default = key
+                    break
+            label_key = _prompt_existing_label(active, default=default)
+            ops.resolve_held_with_existing(message.gmail_id, label_key, apply=True)
+            console.print(f"[green]Filed under '{label_key}'.[/green]")
+            # Refresh active keys in case user somehow activated during session.
+            active = ops.taxonomy.active_keys()
+        elif choice.startswith("n"):
+            suggested = typer.prompt("New key (kebab-case)")
+            description = typer.prompt("One-line description")
+            why = typer.prompt("Why no existing fit")
+            ops.resolve_held_with_new(
+                message.gmail_id,
+                suggested_key=suggested,
+                description=description,
+                why=why,
+                apply=True,
+            )
+            console.print(f"[green]Created and applied '{suggested}'.[/green]")
+            active = ops.taxonomy.active_keys()
         else:
             console.print("[dim]Skipped.[/dim]")
 
@@ -361,13 +413,21 @@ def review_list() -> None:
         TaxonomyRegistry(session, settings).ensure_seeded()
         props = queue.list_pending_proposals()
         needs = queue.list_needs_review()
-    console.print(f"Proposals: {len(props)} | Needs review: {len(needs)}")
+        held = queue.list_held()
+    console.print(
+        f"Proposals: {len(props)} | Needs review: {len(needs)} | Held: {len(held)}"
+    )
     for p in props:
         console.print(f"  proposal #{p.id} {p.suggested_key} ← {p.gmail_id}")
-    for message, record in needs:
+    for message, need_record in needs:
         console.print(
-            f"  needs-review {message.gmail_id} predicted={record.predicted_key} "
-            f"conf={record.confidence}"
+            f"  needs-review {message.gmail_id} predicted={need_record.predicted_key} "
+            f"conf={need_record.confidence}"
+        )
+    for message, held_record in held:
+        predicted = held_record.predicted_key if held_record else None
+        console.print(
+            f"  held {message.gmail_id} predicted={predicted} · {message.subject[:60]}"
         )
 
 

@@ -173,6 +173,52 @@ async def test_approve_proposal_requeues_held(
 
 
 @pytest.mark.asyncio
+async def test_held_messages_appear_and_can_be_filed(
+    session, settings: Settings, fake_gmail
+) -> None:
+    from tagsmith.classify import pipeline as pipeline_mod
+
+    async def no_fit(email, **kwargs):  # type: ignore[no-untyped-def]
+        return Classification(
+            label_key=None,
+            confidence=0.9,
+            rationale="Does not fit; maybe promotion though.",
+            proposed_new=NewCategory(
+                suggested_key="uncategorized-followup",
+                description="fallback",
+                why_no_existing_fit="none",
+            ),
+        )
+
+    pipeline_mod.classify_email = no_fit  # type: ignore[assignment]
+    # Two HTML-ish messages that will both hold; second proposal dedupes.
+    second = dict(HTML_ONLY)
+    second["id"] = "msg_html_2"
+    second["threadId"] = "thr_html_2"
+    fake_gmail.messages = {
+        "msg_html_1": dict(HTML_ONLY),
+        "msg_html_2": second,
+    }
+    service = SyncService(session, fake_gmail, settings)
+    result = await service.sync(limit=10, apply=True)
+    assert result.counts.held == 2
+    assert result.counts.proposals == 1  # deduped
+
+    ops = ReviewOps(session, fake_gmail, settings)
+    held = ops.list_held()
+    assert len(held) == 2
+
+    ops.resolve_held_with_existing("msg_html_1", "promotion", apply=True)
+    ops.resolve_held_with_existing("msg_html_2", "promotion", apply=True)
+
+    assert ops.list_held() == []
+    assert session.get(Message, "msg_html_1").state == MessageState.LABELED  # type: ignore[union-attr]
+    assert session.get(Message, "msg_html_2").applied_label_key == "promotion"  # type: ignore[union-attr]
+    # Proposal queue should no longer show items for resolved messages.
+    assert ops.list_proposals() == []
+
+
+@pytest.mark.asyncio
 async def test_assign_existing_label_closes_proposal(
     session, settings: Settings, fake_gmail
 ) -> None:

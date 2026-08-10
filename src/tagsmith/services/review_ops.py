@@ -50,11 +50,168 @@ class ReviewOps:
         out: list[ProposalView] = []
         for proposal in self.queue.list_pending_proposals():
             msg = self.session.get(Message, proposal.gmail_id)
+            # Skip proposals already resolved via the held-message review path.
+            if msg is not None and msg.state != MessageState.HELD:
+                continue
             out.append(ProposalView(proposal=proposal, message=msg))
         return out
 
     def list_needs_review(self) -> list[tuple[Message, ClassificationRecord]]:
         return self.queue.list_needs_review()
+
+    def list_held(self) -> list[tuple[Message, ClassificationRecord | None]]:
+        return self.queue.list_held()
+
+    def _needs_review_label_id(self) -> str | None:
+        for label in self.gmail.list_labels():
+            if label.get("name") == self.settings.needs_review_label_name:
+                return str(label.get("id") or "") or None
+        return None
+
+    def _close_pending_proposals_for_message(self, gmail_id: str) -> None:
+        pending = self.session.exec(
+            select(Proposal).where(
+                Proposal.gmail_id == gmail_id,
+                Proposal.status == ProposalStatus.PENDING,
+            )
+        ).all()
+        now = datetime.now(UTC)
+        for proposal in pending:
+            proposal.status = ProposalStatus.REJECTED
+            proposal.decided_at = now
+
+    def resolve_held_with_existing(
+        self,
+        gmail_id: str,
+        label_key: str,
+        *,
+        apply: bool = True,
+    ) -> ClassificationRecord:
+        """File a held message under an existing label and clear its review state."""
+        if label_key not in self.taxonomy.active_keys():
+            raise ValueError(f"unknown active label: {label_key}")
+
+        message = self.session.get(Message, gmail_id)
+        if message is None:
+            raise KeyError(gmail_id)
+        if message.state != MessageState.HELD:
+            raise ValueError(f"message {gmail_id} is {message.state}, expected held")
+
+        latest = self.session.exec(
+            select(ClassificationRecord)
+            .where(ClassificationRecord.gmail_id == gmail_id)
+            .order_by(ClassificationRecord.created_at.desc())  # type: ignore[attr-defined]
+        ).first()
+        predicted = latest.predicted_key if latest else None
+
+        label_id: str | None = None
+        if apply:
+            remove_ids: list[str] = []
+            if message.applied_label_id:
+                remove_ids.append(message.applied_label_id)
+            review_id = self._needs_review_label_id()
+            if review_id:
+                remove_ids.append(review_id)
+            label = self.gmail.get_or_create_label(self.settings.gmail_label_name(label_key))
+            label_id = str(label.get("id") or "")
+            self.gmail.modify_labels(
+                gmail_id,
+                add_label_ids=[label_id],
+                remove_label_ids=remove_ids,
+            )
+
+        self._close_pending_proposals_for_message(gmail_id)
+        message.state = MessageState.LABELED
+        message.applied_label_key = label_key
+        message.applied_label_id = label_id
+        message.updated_at = utcnow()
+
+        record = ClassificationRecord(
+            gmail_id=gmail_id,
+            label_key=label_key,
+            predicted_key=predicted,
+            final_key=label_key,
+            confidence=None,
+            rationale=f"Human filed held message under existing label '{label_key}'",
+            source=ClassificationSource.HUMAN,
+            applied_at=utcnow() if apply else None,
+            needs_review=False,
+            review_status=ReviewStatus.CHANGED,
+        )
+        self.session.add(record)
+        self.session.commit()
+        self.session.refresh(record)
+        log.info("held.assigned_existing", gmail_id=gmail_id, label_key=label_key)
+        return record
+
+    def resolve_held_with_new(
+        self,
+        gmail_id: str,
+        *,
+        suggested_key: str,
+        description: str,
+        why: str,
+        apply: bool = True,
+    ) -> ClassificationRecord:
+        """Create/activate a new category and apply it to a held message."""
+        message = self.session.get(Message, gmail_id)
+        if message is None:
+            raise KeyError(gmail_id)
+        if message.state != MessageState.HELD:
+            raise ValueError(f"message {gmail_id} is {message.state}, expected held")
+
+        latest = self.session.exec(
+            select(ClassificationRecord)
+            .where(ClassificationRecord.gmail_id == gmail_id)
+            .order_by(ClassificationRecord.created_at.desc())  # type: ignore[attr-defined]
+        ).first()
+        predicted = latest.predicted_key if latest else None
+
+        label_id: str | None = None
+        if apply:
+            remove_ids: list[str] = []
+            review_id = self._needs_review_label_id()
+            if review_id:
+                remove_ids.append(review_id)
+            label = self.gmail.get_or_create_label(
+                self.settings.gmail_label_name(suggested_key)
+            )
+            label_id = str(label.get("id") or "")
+            self.gmail.modify_labels(
+                gmail_id,
+                add_label_ids=[label_id],
+                remove_label_ids=remove_ids,
+            )
+
+        self.taxonomy.activate_category(
+            suggested_key,
+            description,
+            gmail_label_id=label_id,
+        )
+        self._close_pending_proposals_for_message(gmail_id)
+
+        message.state = MessageState.LABELED
+        message.applied_label_key = suggested_key
+        message.applied_label_id = label_id
+        message.updated_at = utcnow()
+
+        record = ClassificationRecord(
+            gmail_id=gmail_id,
+            label_key=suggested_key,
+            predicted_key=predicted,
+            final_key=suggested_key,
+            confidence=None,
+            rationale=f"Human created category '{suggested_key}' for held message ({why})",
+            source=ClassificationSource.HUMAN,
+            applied_at=utcnow() if apply else None,
+            needs_review=False,
+            review_status=ReviewStatus.PROPOSED_NEW,
+        )
+        self.session.add(record)
+        self.session.commit()
+        self.session.refresh(record)
+        log.info("held.created_category", gmail_id=gmail_id, key=suggested_key)
+        return record
 
     async def approve_proposal(
         self,
@@ -149,13 +306,9 @@ class ReviewOps:
         if apply:
             if message.applied_label_id:
                 remove_ids.append(message.applied_label_id)
-            # Drop needs-review marker if present.
-            for label in self.gmail.list_labels():
-                if label.get("name") == self.settings.needs_review_label_name:
-                    rid = str(label.get("id") or "")
-                    if rid:
-                        remove_ids.append(rid)
-                    break
+            review_id = self._needs_review_label_id()
+            if review_id:
+                remove_ids.append(review_id)
             label = self.gmail.get_or_create_label(self.settings.gmail_label_name(label_key))
             label_id = str(label.get("id") or "")
             self.gmail.modify_labels(
