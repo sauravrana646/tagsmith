@@ -64,11 +64,7 @@ def main() -> int:
     print(format_report(result.report, cases=result.cases))
     if args.json_out:
         args.json_out.parent.mkdir(parents=True, exist_ok=True)
-        payload = {
-            "report": result.report.as_dict(),
-            "cases": [c.__dict__ for c in result.cases],
-        }
-        args.json_out.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        args.json_out.write_text(json.dumps(result.as_dict(), indent=2), encoding="utf-8")
         print(f"wrote {args.json_out}")
     return 0
 

@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from pathlib import Path
+from typing import Any
 
 from tagsmith.classify.pipeline import PipelineResult, classify_with_routing
 from tagsmith.classify.rules import load_rules
@@ -35,11 +36,21 @@ class EvalCaseResult:
     output_tokens: int | None
     rationale: str
 
+    def as_dict(self) -> dict[str, Any]:
+        # slots=True means no ``__dict__``; build explicitly for JSON export.
+        return {f.name: getattr(self, f.name) for f in fields(self)}
+
 
 @dataclass
 class EvalRunResult:
     report: EvalReport
     cases: list[EvalCaseResult]
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "report": self.report.as_dict(),
+            "cases": [c.as_dict() for c in self.cases],
+        }
 
 
 def _active_keys() -> list[str]:

@@ -85,9 +85,45 @@ LOGFIRE_TOKEN=...   # or rely on send_to_logfire=if-token-present
 | `tagsmith.classify.outcome` | Tokens + latency from LLM |
 | `tagsmith.telemetry` | structlog + optional Logfire |
 
+## Live baseline (recorded)
+
+Operator run on Phase 2 branch with `openrouter:deepseek/deepseek-v4-flash-0731`
+against `evals/golden_set.jsonl` (109 cases):
+
+| Metric | Value |
+|--------|------:|
+| Accuracy | **0.945** (103/109) |
+| Rule hit rate | 0.266 |
+| LLM routing rate | 0.734 |
+| Proposal / hold rate | 0.046 |
+| Latency p50 / p95 | ~3.8s / ~11.6s |
+| Tokens in / out | 260111 / 15177 |
+
+**Misses (6):**
+
+| Case | Expected | Got | Source |
+|------|----------|-----|--------|
+| `gold_travel_uber` | travel-booking | payment-sent | llm |
+| `gold_support_billing` | support-ticket | refund | llm |
+| `gold_refund_chargeback` | refund | payment-sent | **rule** |
+| `gold_hold_insurance` | hold (None) | subscription-renewal | llm |
+| `gold_hold_court` | hold (None) | security-alert | llm |
+| `gold_hold_gov_id` | hold (None) | travel-booking | llm |
+
+**Threshold decision:** keep defaults (`apply=0.75`, `review=0.5`) for now — overall
+accuracy is high; remaining work is label disambiguation / rule hygiene, not cutoff
+tuning. Revisit thresholds after adding ~50–100 real inbox corrections.
+
+Re-run and persist JSON:
+
+```bash
+uv run tagsmith eval --json-out evals/baseline_live.json
+```
+
 ## Success criteria for “Phase 2 done”
 
 - [x] Golden set ≥ 100 labeled cases (diverse senders/labels) — synthetic seed; replace/augment with real inbox over time
-- [ ] Live eval baseline checked in as a JSON artifact or docs note (**deferred — needs LLM API keys**)
-- [ ] Threshold tuning decisions recorded in DECISIONS.md from eval data (**deferred — depends on live baseline**)
-- [ ] Logfire (or OTel exporter) usable for a real sync run
+- [x] Live eval baseline recorded (above; optionally commit `evals/baseline_live.json`)
+- [x] Threshold tuning decision recorded (keep defaults; see above + DECISIONS.md)
+- [ ] Logfire (or OTel exporter) usable for a real sync run (optional)
+- [ ] Fix / document the 6 known golden misses (rules + prompt / expected labels)

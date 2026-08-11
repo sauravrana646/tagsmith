@@ -211,11 +211,7 @@ def eval_cmd(
         import json
 
         json_out.parent.mkdir(parents=True, exist_ok=True)
-        payload = {
-            "report": result.report.as_dict(),
-            "cases": [c.__dict__ for c in result.cases],
-        }
-        json_out.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        json_out.write_text(json.dumps(result.as_dict(), indent=2), encoding="utf-8")
         console.print(f"[green]wrote[/green] {json_out}")
 
 
