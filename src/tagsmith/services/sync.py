@@ -25,6 +25,9 @@ from tagsmith.db.models import (
 )
 from tagsmith.gmail.parser import NormalizedEmail, normalize_message
 from tagsmith.gmail.protocol import GmailGateway
+from tagsmith.rag.index import index_normalized, make_store
+from tagsmith.rag.retriever import Retriever, format_category_hints
+from tagsmith.rag.store import example_text_from_email
 from tagsmith.review.queue import ReviewService
 from tagsmith.taxonomy.registry import TaxonomyRegistry
 from tagsmith.telemetry import get_logger, span
@@ -39,6 +42,7 @@ class SyncCounts:
     skipped_user_removed: int = 0
     rule_labeled: int = 0
     llm_labeled: int = 0
+    rag_labeled: int = 0
     needs_review: int = 0
     held: int = 0
     proposals: int = 0
@@ -52,6 +56,7 @@ class SyncCounts:
             "skipped_user_removed": self.skipped_user_removed,
             "rule_labeled": self.rule_labeled,
             "llm_labeled": self.llm_labeled,
+            "rag_labeled": self.rag_labeled,
             "needs_review": self.needs_review,
             "held": self.held,
             "proposals": self.proposals,
@@ -241,25 +246,53 @@ class SyncService:
         catalog = self.taxonomy.prompt_catalog()
         blocked = self._blocked_keys(email.gmail_id)
 
+        examples = None
+        category_hints = None
+        if self.settings.enable_rag:
+            store = make_store(self.session, self.settings)
+            retriever = Retriever(
+                store,
+                store.embedder,
+                example_k=self.settings.rag_example_k,
+                category_k=self.settings.rag_category_k,
+            )
+            query = example_text_from_email(
+                sender=email.sender,
+                subject=email.subject,
+                body_text=email.body_text,
+            )["text"]
+            rag_ctx = retriever.retrieve(
+                query,
+                exclude_gmail_ids={email.gmail_id},
+            )
+            examples = rag_ctx.examples or None
+            category_hints = format_category_hints(rag_ctx.category_hints) or None
+
         result = await classify_with_routing(
             email,
             rules=rules,
             label_keys=active_keys,
             catalog=catalog,
             settings=self.settings,
-            examples=None,
+            examples=examples,
+            category_hints=category_hints,
             blocked_keys=blocked,
         )
         # Count model-schema fallbacks (held with confidence 0 + invalid-output rationale).
         if (
-            result.source == "llm"
+            result.source in {"llm", "rag"}
             and result.classification.confidence == 0.0
             and "Model output invalid" in result.classification.rationale
         ):
             counts.classify_errors += 1
         classification = result.classification
         route = result.route
-        source = ClassificationSource.RULE if result.source == "rule" else ClassificationSource.LLM
+        if result.source == "rule":
+            source = ClassificationSource.RULE
+        elif result.source == "rag":
+            source = ClassificationSource.RAG
+        else:
+            source = ClassificationSource.LLM
 
         needs_review = route == "apply_with_review"
         hold = route == "hold_propose"
@@ -319,6 +352,8 @@ class SyncService:
 
         if result.source == "rule":
             counts.rule_labeled += 1
+        elif result.source == "rag":
+            counts.rag_labeled += 1
         else:
             counts.llm_labeled += 1
 
@@ -349,6 +384,10 @@ class SyncService:
         self.session.add(record)
         self.session.commit()
 
+        # Index confidently applied labels into the RAG store for future few-shots.
+        if self.settings.enable_rag and label_key and not hold and not needs_review:
+            index_normalized(make_store(self.session, self.settings), email, label_key=label_key)
+
         decisions.append(
             {
                 "gmail_id": email.gmail_id,
@@ -366,6 +405,7 @@ class SyncService:
                 "applied": bool(apply and not hold and label_key),
                 "tokens": result.total_tokens,
                 "latency_ms": result.latency_ms,
+                "rag_examples": result.rag_example_count,
             }
         )
 

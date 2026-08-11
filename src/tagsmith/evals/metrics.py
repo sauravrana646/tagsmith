@@ -139,7 +139,8 @@ def compute_report(
         )
 
     rule_hits = sum(1 for s in sources if s == "rule")
-    llm_hits = sum(1 for s in sources if s == "llm")
+    # Phase 3: RAG-backed LLM path counts as model routing alongside plain llm.
+    llm_hits = sum(1 for s in sources if s in {"llm", "rag"})
     holds = sum(1 for r in routes if r == "hold_propose")
     proposals = sum(1 for p in has_proposals if p)
 

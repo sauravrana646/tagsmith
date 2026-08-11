@@ -222,12 +222,42 @@ def build_cases() -> list[dict[str, Any]]:
 
     # --- bill-due ---
     bill_due = [
-        ("electric", "Electric Co <billing@utility.example>", "Your electricity bill is due March 20", "Amount due $118.22. Pay by March 20."),
-        ("cc", "Chase <creditcards@chase.com>", "Reminder: credit card payment due tomorrow", "Minimum payment due $35. Full balance $1,204.11."),
-        ("invoice", "Acme Billing <billing@acme.example>", "Invoice #1042 is ready — amount due $1,200", "Please remit $1,200 by Apr 1. Invoice attached as PDF link."),
-        ("water", "City Water <noreply@citywater.example>", "Water bill of $42.10 is due", "Your residential water bill is due in 7 days."),
-        ("phone", "Verizon <verizon@email.verizonwireless.com>", "Your wireless bill is ready to pay", "Amount due $89.00 by Aug 28. Autopay is off."),
-        ("rent", "Property Mgmt <billing@apartments.example>", "August rent invoice — amount owed $2,150", "Rent for unit 4B is due on the 1st."),
+        (
+            "electric",
+            "Electric Co <billing@utility.example>",
+            "Your electricity bill is due March 20",
+            "Amount due $118.22. Pay by March 20.",
+        ),
+        (
+            "cc",
+            "Chase <creditcards@chase.com>",
+            "Reminder: credit card payment due tomorrow",
+            "Minimum payment due $35. Full balance $1,204.11.",
+        ),
+        (
+            "invoice",
+            "Acme Billing <billing@acme.example>",
+            "Invoice #1042 is ready — amount due $1,200",
+            "Please remit $1,200 by Apr 1. Invoice attached as PDF link.",
+        ),
+        (
+            "water",
+            "City Water <noreply@citywater.example>",
+            "Water bill of $42.10 is due",
+            "Your residential water bill is due in 7 days.",
+        ),
+        (
+            "phone",
+            "Verizon <verizon@email.verizonwireless.com>",
+            "Your wireless bill is ready to pay",
+            "Amount due $89.00 by Aug 28. Autopay is off.",
+        ),
+        (
+            "rent",
+            "Property Mgmt <billing@apartments.example>",
+            "August rent invoice — amount owed $2,150",
+            "Rent for unit 4B is due on the 1st.",
+        ),
     ]
     for slug, sender, subject, body in bill_due:
         cases.append(
@@ -249,12 +279,42 @@ def build_cases() -> list[dict[str, Any]]:
 
     # --- subscription-renewal ---
     subs = [
-        ("netflix", "Netflix <info@mailer.netflix.com>", "Your membership will renew on April 1", "Your plan renews soon. No action needed."),
-        ("spotify", "Spotify <no-reply@spotify.com>", "Spotify Premium auto-renewal receipt", "We'll renew Premium for $10.99 on Aug 20."),
-        ("github", "GitHub <billing@github.com>", "GitHub Pro will renew for $4", "Your GitHub Pro subscription renews in 3 days."),
-        ("notion", "Notion <noreply@notion.so>", "Your Notion Plus subscription renews soon", "Next charge $10 on Sep 1."),
-        ("adobe", "Adobe <mail@adobe.com>", "Upcoming renewal for Creative Cloud", "Your annual plan renews on Sep 12 for $59.99/mo."),
-        ("nytimes", "NYT <nytdirect@nytimes.com>", "Your New York Times subscription renews", "Digital All Access renews automatically next month."),
+        (
+            "netflix",
+            "Netflix <info@mailer.netflix.com>",
+            "Your membership will renew on April 1",
+            "Your plan renews soon. No action needed.",
+        ),
+        (
+            "spotify",
+            "Spotify <no-reply@spotify.com>",
+            "Spotify Premium auto-renewal receipt",
+            "We'll renew Premium for $10.99 on Aug 20.",
+        ),
+        (
+            "github",
+            "GitHub <billing@github.com>",
+            "GitHub Pro will renew for $4",
+            "Your GitHub Pro subscription renews in 3 days.",
+        ),
+        (
+            "notion",
+            "Notion <noreply@notion.so>",
+            "Your Notion Plus subscription renews soon",
+            "Next charge $10 on Sep 1.",
+        ),
+        (
+            "adobe",
+            "Adobe <mail@adobe.com>",
+            "Upcoming renewal for Creative Cloud",
+            "Your annual plan renews on Sep 12 for $59.99/mo.",
+        ),
+        (
+            "nytimes",
+            "NYT <nytdirect@nytimes.com>",
+            "Your New York Times subscription renews",
+            "Digital All Access renews automatically next month.",
+        ),
     ]
     for slug, sender, subject, body in subs:
         cases.append(
@@ -340,12 +400,48 @@ def build_cases() -> list[dict[str, Any]]:
 
     # --- otp-verification ---
     otps = [
-        ("github", "GitHub <noreply@github.com>", "Your GitHub verification code", "Your verification code is 482193.", "apply"),
-        ("chase", "Chase Alerts <no.reply.alerts@chase.com>", "Your one-time authorization code", "Authorization code: 918273. Expires in 10 minutes.", "apply"),
-        ("generic", "Auth <noreply@auth.example>", "Your OTP is 553201", "One-time passcode 553201 for login.", "apply"),
-        ("aws", "Amazon Web Services <no-reply@signin.aws>", "Your AWS verification code", "Verification code: 771902.", "apply"),
-        ("discord", "Discord <noreply@discord.com>", "Discord login code: 229183", "Enter 229183 to finish signing in. It expires in 10 minutes.", "apply"),
-        ("bank", "Bank of America <onlinebanking@ealerts.bankofamerica.com>", "One-time passcode for your bank login", "Your OTP is 440192.", "apply"),
+        (
+            "github",
+            "GitHub <noreply@github.com>",
+            "Your GitHub verification code",
+            "Your verification code is 482193.",
+            "apply",
+        ),
+        (
+            "chase",
+            "Chase Alerts <no.reply.alerts@chase.com>",
+            "Your one-time authorization code",
+            "Authorization code: 918273. Expires in 10 minutes.",
+            "apply",
+        ),
+        (
+            "generic",
+            "Auth <noreply@auth.example>",
+            "Your OTP is 553201",
+            "One-time passcode 553201 for login.",
+            "apply",
+        ),
+        (
+            "aws",
+            "Amazon Web Services <no-reply@signin.aws>",
+            "Your AWS verification code",
+            "Verification code: 771902.",
+            "apply",
+        ),
+        (
+            "discord",
+            "Discord <noreply@discord.com>",
+            "Discord login code: 229183",
+            "Enter 229183 to finish signing in. It expires in 10 minutes.",
+            "apply",
+        ),
+        (
+            "bank",
+            "Bank of America <onlinebanking@ealerts.bankofamerica.com>",
+            "One-time passcode for your bank login",
+            "Your OTP is 440192.",
+            "apply",
+        ),
     ]
     for slug, sender, subject, body, route in otps:
         cases.append(
@@ -368,12 +464,48 @@ def build_cases() -> list[dict[str, Any]]:
 
     # --- order-confirmation ---
     orders = [
-        ("amazon", "Amazon.com <auto-confirm@amazon.com>", "Ordered: Mechanical Keyboard", "Thanks for your order. We will email you when it ships.", "apply"),
-        ("amazon2", "Amazon.com <auto-confirm@amazon.com>", "Your Amazon.com order of HDMI Cable has been received", "Order confirmed. Order #112-9988776.", "apply"),
-        ("target", "Target <orders@email.target.com>", "Thanks for your order #T99102", "We received your order for 2 items totaling $54.12.", None),
-        ("shopify", "Store <orders@shop.example>", "Order confirmed: Wool sweater", "We've received your order ORD-441. Estimated ship in 2 days.", None),
-        ("bestbuy", "Best Buy <BestBuyInfo@emailinfo.bestbuy.com>", "Thanks for your Best Buy order", "Order #BBY-1200 confirmed for MacBook sleeve.", None),
-        ("etsy", "Etsy <noreply@etsy.com>", "Your Etsy order is confirmed", "Order from CeramicStudio is confirmed.", None),
+        (
+            "amazon",
+            "Amazon.com <auto-confirm@amazon.com>",
+            "Ordered: Mechanical Keyboard",
+            "Thanks for your order. We will email you when it ships.",
+            "apply",
+        ),
+        (
+            "amazon2",
+            "Amazon.com <auto-confirm@amazon.com>",
+            "Your Amazon.com order of HDMI Cable has been received",
+            "Order confirmed. Order #112-9988776.",
+            "apply",
+        ),
+        (
+            "target",
+            "Target <orders@email.target.com>",
+            "Thanks for your order #T99102",
+            "We received your order for 2 items totaling $54.12.",
+            None,
+        ),
+        (
+            "shopify",
+            "Store <orders@shop.example>",
+            "Order confirmed: Wool sweater",
+            "We've received your order ORD-441. Estimated ship in 2 days.",
+            None,
+        ),
+        (
+            "bestbuy",
+            "Best Buy <BestBuyInfo@emailinfo.bestbuy.com>",
+            "Thanks for your Best Buy order",
+            "Order #BBY-1200 confirmed for MacBook sleeve.",
+            None,
+        ),
+        (
+            "etsy",
+            "Etsy <noreply@etsy.com>",
+            "Your Etsy order is confirmed",
+            "Order from CeramicStudio is confirmed.",
+            None,
+        ),
     ]
     for slug, sender, subject, body, route in orders:
         cases.append(
@@ -396,12 +528,48 @@ def build_cases() -> list[dict[str, Any]]:
 
     # --- shipping-update ---
     shipping = [
-        ("amazon_ship", "Amazon.com <shipment-tracking@amazon.com>", "Your Amazon.com order of USB-C Hub has shipped", "Shipped with tracking TBA123.", "apply"),
-        ("amazon_del", "Amazon.com <shipment-tracking@amazon.com>", "Delivered: USB-C Hub", "Your package was delivered today at 11:42 AM.", "apply"),
-        ("ups", "UPS <mcinfo@ups.com>", "UPS Update: Your package is out for delivery", "Tracking 1Z999AA10123456784 is out for delivery.", None),
-        ("fedex", "FedEx <fedex@fedex.com>", "Delivered: your item was left at the front door", "FedEx delivered package 7946xxxx.", None),
-        ("usps", "USPS <usps@email.informeddelivery.usps.com>", "Your package is in transit", "USPS tracking shows in transit to local facility.", None),
-        ("delay", "Amazon.com <shipment-tracking@amazon.com>", "Delayed: tracking update for your package", "Delivery delayed by weather. New date tomorrow.", "apply"),
+        (
+            "amazon_ship",
+            "Amazon.com <shipment-tracking@amazon.com>",
+            "Your Amazon.com order of USB-C Hub has shipped",
+            "Shipped with tracking TBA123.",
+            "apply",
+        ),
+        (
+            "amazon_del",
+            "Amazon.com <shipment-tracking@amazon.com>",
+            "Delivered: USB-C Hub",
+            "Your package was delivered today at 11:42 AM.",
+            "apply",
+        ),
+        (
+            "ups",
+            "UPS <mcinfo@ups.com>",
+            "UPS Update: Your package is out for delivery",
+            "Tracking 1Z999AA10123456784 is out for delivery.",
+            None,
+        ),
+        (
+            "fedex",
+            "FedEx <fedex@fedex.com>",
+            "Delivered: your item was left at the front door",
+            "FedEx delivered package 7946xxxx.",
+            None,
+        ),
+        (
+            "usps",
+            "USPS <usps@email.informeddelivery.usps.com>",
+            "Your package is in transit",
+            "USPS tracking shows in transit to local facility.",
+            None,
+        ),
+        (
+            "delay",
+            "Amazon.com <shipment-tracking@amazon.com>",
+            "Delayed: tracking update for your package",
+            "Delivery delayed by weather. New date tomorrow.",
+            "apply",
+        ),
     ]
     for slug, sender, subject, body, route in shipping:
         cases.append(
@@ -424,12 +592,42 @@ def build_cases() -> list[dict[str, Any]]:
 
     # --- travel-booking ---
     travel = [
-        ("united", "United Airlines <united@united.com>", "Your upcoming trip to SFO — confirmation", "Flight UA123 SFO on April 4. Confirmation ABC123."),
-        ("marriott", "Marriott <noreply@marriott.com>", "Hotel reservation at Marriott Downtown", "Reservation confirmed for 2 nights starting Sep 3."),
-        ("uber", "Uber <uber.receipts@uber.com>", "Your Uber trip with UberX on Monday", "You rode to SFO. Total $42.10. Receipt attached in app."),
-        ("amtrak", "Amtrak <noreply@amtrak.com>", "Your Amtrak eTicket is ready", "Train 2155 NYC → BOS on Aug 22. Booking PNR991."),
-        ("airbnb", "Airbnb <automated@airbnb.com>", "Your reservation is confirmed in Lisbon", "Check-in Friday after 3pm. Confirmation HMXYZ."),
-        ("delta", "Delta Air Lines <DeltaAirLines@delta.com>", "Boarding pass ready — DL 421", "Your boarding pass for DL 421 ATW → ATX is ready."),
+        (
+            "united",
+            "United Airlines <united@united.com>",
+            "Your upcoming trip to SFO — confirmation",
+            "Flight UA123 SFO on April 4. Confirmation ABC123.",
+        ),
+        (
+            "marriott",
+            "Marriott <noreply@marriott.com>",
+            "Hotel reservation at Marriott Downtown",
+            "Reservation confirmed for 2 nights starting Sep 3.",
+        ),
+        (
+            "uber",
+            "Uber <uber.receipts@uber.com>",
+            "Your Uber trip with UberX on Monday",
+            "You rode to SFO. Total $42.10. Receipt attached in app.",
+        ),
+        (
+            "amtrak",
+            "Amtrak <noreply@amtrak.com>",
+            "Your Amtrak eTicket is ready",
+            "Train 2155 NYC → BOS on Aug 22. Booking PNR991.",
+        ),
+        (
+            "airbnb",
+            "Airbnb <automated@airbnb.com>",
+            "Your reservation is confirmed in Lisbon",
+            "Check-in Friday after 3pm. Confirmation HMXYZ.",
+        ),
+        (
+            "delta",
+            "Delta Air Lines <DeltaAirLines@delta.com>",
+            "Boarding pass ready — DL 421",
+            "Your boarding pass for DL 421 ATW → ATX is ready.",
+        ),
     ]
     for slug, sender, subject, body in travel:
         # Uber trip receipt is travel-ish but often payment-sent; keep as travel-booking
@@ -453,12 +651,48 @@ def build_cases() -> list[dict[str, Any]]:
 
     # --- newsletter ---
     newsletters = [
-        ("tldr", "TLDR AI <news@tldrnewsletter.com>", "This week in AI research", "Welcome to this week's digest...", True),
-        ("atlantic", "The Atlantic <newsletters@theatlantic.com>", "Your Sunday reading list from The Atlantic", "Five stories worth your time this weekend.", True),
-        ("substack", "ByteSized <newsletter@substack.com>", "Weekly product roundup", "Issue #128 of the ByteSized newsletter.", True),
-        ("github_blog", "GitHub <newsletter@github.com>", "GitHub Digest: this week in open source", "Highlights from the GitHub Blog this week.", True),
-        ("stratechery", "Stratechery <noreply@stratechery.com>", "Stratechery Weekly Roundup", "A weekly roundup of Stratechery articles.", True),
-        ("local", "City Bulletin <bulletin@city.example>", "Neighborhood weekly digest", "Events and notices for your district this week.", True),
+        (
+            "tldr",
+            "TLDR AI <news@tldrnewsletter.com>",
+            "This week in AI research",
+            "Welcome to this week's digest...",
+            True,
+        ),
+        (
+            "atlantic",
+            "The Atlantic <newsletters@theatlantic.com>",
+            "Your Sunday reading list from The Atlantic",
+            "Five stories worth your time this weekend.",
+            True,
+        ),
+        (
+            "substack",
+            "ByteSized <newsletter@substack.com>",
+            "Weekly product roundup",
+            "Issue #128 of the ByteSized newsletter.",
+            True,
+        ),
+        (
+            "github_blog",
+            "GitHub <newsletter@github.com>",
+            "GitHub Digest: this week in open source",
+            "Highlights from the GitHub Blog this week.",
+            True,
+        ),
+        (
+            "stratechery",
+            "Stratechery <noreply@stratechery.com>",
+            "Stratechery Weekly Roundup",
+            "A weekly roundup of Stratechery articles.",
+            True,
+        ),
+        (
+            "local",
+            "City Bulletin <bulletin@city.example>",
+            "Neighborhood weekly digest",
+            "Events and notices for your district this week.",
+            True,
+        ),
     ]
     for slug, sender, subject, body, unsub in newsletters:
         cases.append(
@@ -484,12 +718,42 @@ def build_cases() -> list[dict[str, Any]]:
 
     # --- promotion ---
     promos = [
-        ("flash", "Shop <deals@merchant.example>", "Flash sale — 40% off ends tonight", "Save 40% with code SAVE40."),
-        ("exclusive", "Nike <nike@email.nike.com>", "Exclusive offer just for you", "Members get an extra 20% off selected styles."),
-        ("spring", "Gap <gap@email.gap.com>", "Introducing our new spring collection", "Shop new arrivals before they sell out."),
-        ("winback", "Spotify <no-reply@spotify.com>", "Come back — 3 months for $0.99", "A limited-time offer to restart Premium."),
-        ("launch", "Notion <noreply@notion.so>", "Launch offer: Notion AI add-on discounted", "Try Notion AI at 50% off for 3 months."),
-        ("airline_sale", "United <united@united.com>", "Flash sale: domestic flights from $59", "Book by midnight for travel in September."),
+        (
+            "flash",
+            "Shop <deals@merchant.example>",
+            "Flash sale — 40% off ends tonight",
+            "Save 40% with code SAVE40.",
+        ),
+        (
+            "exclusive",
+            "Nike <nike@email.nike.com>",
+            "Exclusive offer just for you",
+            "Members get an extra 20% off selected styles.",
+        ),
+        (
+            "spring",
+            "Gap <gap@email.gap.com>",
+            "Introducing our new spring collection",
+            "Shop new arrivals before they sell out.",
+        ),
+        (
+            "winback",
+            "Spotify <no-reply@spotify.com>",
+            "Come back — 3 months for $0.99",
+            "A limited-time offer to restart Premium.",
+        ),
+        (
+            "launch",
+            "Notion <noreply@notion.so>",
+            "Launch offer: Notion AI add-on discounted",
+            "Try Notion AI at 50% off for 3 months.",
+        ),
+        (
+            "airline_sale",
+            "United <united@united.com>",
+            "Flash sale: domestic flights from $59",
+            "Book by midnight for travel in September.",
+        ),
     ]
     for slug, sender, subject, body in promos:
         cases.append(
@@ -512,12 +776,42 @@ def build_cases() -> list[dict[str, Any]]:
 
     # --- job-application ---
     jobs = [
-        ("lever", "Jobs <noreply@lever.co>", "Thanks for applying to Staff Engineer at Acme", "We received your application."),
-        ("interview", "Acme Recruiting <recruiting@acme.example>", "Interview scheduled with Acme hiring team", "Phone screen Thursday 2pm PT."),
-        ("status", "Greenhouse <no-reply@greenhouse.io>", "Your application status has been updated", "Moved to onsite interview stage."),
-        ("linkedin", "LinkedIn <jobs-listings@linkedin.com>", "InMail: Role matching your profile — Staff SWE", "A recruiter reached out about a Staff Engineer role."),
-        ("offer", "Acme Recruiting <recruiting@acme.example>", "Offer update for Staff Engineer", "We'd like to extend a verbal offer contingent on references."),
-        ("reject", "People Ops <careers@startup.example>", "Update on your application to Backend Engineer", "We've decided to move forward with other candidates."),
+        (
+            "lever",
+            "Jobs <noreply@lever.co>",
+            "Thanks for applying to Staff Engineer at Acme",
+            "We received your application.",
+        ),
+        (
+            "interview",
+            "Acme Recruiting <recruiting@acme.example>",
+            "Interview scheduled with Acme hiring team",
+            "Phone screen Thursday 2pm PT.",
+        ),
+        (
+            "status",
+            "Greenhouse <no-reply@greenhouse.io>",
+            "Your application status has been updated",
+            "Moved to onsite interview stage.",
+        ),
+        (
+            "linkedin",
+            "LinkedIn <jobs-listings@linkedin.com>",
+            "InMail: Role matching your profile — Staff SWE",
+            "A recruiter reached out about a Staff Engineer role.",
+        ),
+        (
+            "offer",
+            "Acme Recruiting <recruiting@acme.example>",
+            "Offer update for Staff Engineer",
+            "We'd like to extend a verbal offer contingent on references.",
+        ),
+        (
+            "reject",
+            "People Ops <careers@startup.example>",
+            "Update on your application to Backend Engineer",
+            "We've decided to move forward with other candidates.",
+        ),
     ]
     for slug, sender, subject, body in jobs:
         cases.append(
@@ -539,12 +833,42 @@ def build_cases() -> list[dict[str, Any]]:
 
     # --- support-ticket ---
     support = [
-        ("saas", "Support <support@saas.example>", "Re: Ticket #4821 — login issue update", "We're still investigating your login issue."),
-        ("received", "Helpdesk <support@vendor.example>", "[Ticket #45821] We've received your request", "An agent will reply within 24 hours."),
-        ("resolved", "Support <support@saas.example>", "Your support case was resolved", "Ticket #4821 marked resolved. Reply to reopen."),
-        ("billing", "Billing Support <billing@saas.example>", "Re: Help with billing — agent reply", "We refunded the duplicate charge on invoice 88."),
-        ("zendesk", "Acme Support <support@acme.zendesk.com>", "[Acme] Request received — #99102", "Thanks for contacting support. Ticket #99102 created."),
-        ("shipping_help", "Store Support <help@shop.example>", "Re: Missing package — ticket update", "Carrier confirmed delay; we've issued a replacement."),
+        (
+            "saas",
+            "Support <support@saas.example>",
+            "Re: Ticket #4821 — login issue update",
+            "We're still investigating your login issue.",
+        ),
+        (
+            "received",
+            "Helpdesk <support@vendor.example>",
+            "[Ticket #45821] We've received your request",
+            "An agent will reply within 24 hours.",
+        ),
+        (
+            "resolved",
+            "Support <support@saas.example>",
+            "Your support case was resolved",
+            "Ticket #4821 marked resolved. Reply to reopen.",
+        ),
+        (
+            "billing",
+            "Billing Support <billing@saas.example>",
+            "Re: Help with billing — agent reply",
+            "We refunded the duplicate charge on invoice 88.",
+        ),
+        (
+            "zendesk",
+            "Acme Support <support@acme.zendesk.com>",
+            "[Acme] Request received — #99102",
+            "Thanks for contacting support. Ticket #99102 created.",
+        ),
+        (
+            "shipping_help",
+            "Store Support <help@shop.example>",
+            "Re: Missing package — ticket update",
+            "Carrier confirmed delay; we've issued a replacement.",
+        ),
     ]
     for slug, sender, subject, body in support:
         cases.append(
@@ -566,12 +890,43 @@ def build_cases() -> list[dict[str, Any]]:
 
     # --- account-statement ---
     statements = [
-        ("march", "Billing <billing@acme.example>", "Your March account statement is ready", "Your March account statement is attached as invoice_march.pdf.", "invoice_march.pdf"),
-        ("chase_cc", "Chase <statements@chase.com>", "Monthly Chase credit card statement", "Your August statement is ready to view online."),
-        ("broker", "Fidelity <alerts@fidelity.com>", "Brokerage statement available to download", "Your July brokerage statement is now available."),
-        ("bank", "Bank of America <onlinebanking@ealerts.bankofamerica.com>", "Your monthly checking account statement", "Statement period Jul 1–Jul 31 is ready."),
-        ("amex", "American Express <statement@welcome.americanexpress.com>", "Your Amex statement is ready", "View activity and balance for this statement period."),
-        ("paypal", "PayPal <service@paypal.com>", "Your PayPal monthly statement", "Download your monthly account summary."),
+        (
+            "march",
+            "Billing <billing@acme.example>",
+            "Your March account statement is ready",
+            "Your March account statement is attached as invoice_march.pdf.",
+            "invoice_march.pdf",
+        ),
+        (
+            "chase_cc",
+            "Chase <statements@chase.com>",
+            "Monthly Chase credit card statement",
+            "Your August statement is ready to view online.",
+        ),
+        (
+            "broker",
+            "Fidelity <alerts@fidelity.com>",
+            "Brokerage statement available to download",
+            "Your July brokerage statement is now available.",
+        ),
+        (
+            "bank",
+            "Bank of America <onlinebanking@ealerts.bankofamerica.com>",
+            "Your monthly checking account statement",
+            "Statement period Jul 1–Jul 31 is ready.",
+        ),
+        (
+            "amex",
+            "American Express <statement@welcome.americanexpress.com>",
+            "Your Amex statement is ready",
+            "View activity and balance for this statement period.",
+        ),
+        (
+            "paypal",
+            "PayPal <service@paypal.com>",
+            "Your PayPal monthly statement",
+            "Download your monthly account summary.",
+        ),
     ]
     for item in statements:
         slug, sender, subject, body = item[0], item[1], item[2], item[3]
@@ -596,12 +951,42 @@ def build_cases() -> list[dict[str, Any]]:
 
     # --- tax-document ---
     tax = [
-        ("1099", "IRS <noreply@irs.gov>", "Your tax transcript is available", "A new tax transcript is ready to download."),
-        ("w2", "ADP <noreply@adp.com>", "W-2 wage and tax statement available", "Your 2024 Form W-2 is ready."),
-        ("1099nec", "Upwork <noreply@upwork.com>", "Your 1099-NEC is ready", "Download Form 1099-NEC for tax year 2024."),
-        ("broker_tax", "Schwab <donotreply@schwab.com>", "Annual tax document from your broker", "Form 1099 Consolidated is now available."),
-        ("gst", "GST Portal <noreply@gst.example>", "GST filing acknowledgment for Q1", "Your GST return acknowledgment is attached."),
-        ("turbotax", "TurboTax <noreply@turbotax.intuit.com>", "Your tax return documents are ready", "Download copies of your filed return and worksheets."),
+        (
+            "1099",
+            "IRS <noreply@irs.gov>",
+            "Your tax transcript is available",
+            "A new tax transcript is ready to download.",
+        ),
+        (
+            "w2",
+            "ADP <noreply@adp.com>",
+            "W-2 wage and tax statement available",
+            "Your 2024 Form W-2 is ready.",
+        ),
+        (
+            "1099nec",
+            "Upwork <noreply@upwork.com>",
+            "Your 1099-NEC is ready",
+            "Download Form 1099-NEC for tax year 2024.",
+        ),
+        (
+            "broker_tax",
+            "Schwab <donotreply@schwab.com>",
+            "Annual tax document from your broker",
+            "Form 1099 Consolidated is now available.",
+        ),
+        (
+            "gst",
+            "GST Portal <noreply@gst.example>",
+            "GST filing acknowledgment for Q1",
+            "Your GST return acknowledgment is attached.",
+        ),
+        (
+            "turbotax",
+            "TurboTax <noreply@turbotax.intuit.com>",
+            "Your tax return documents are ready",
+            "Download copies of your filed return and worksheets.",
+        ),
     ]
     for slug, sender, subject, body in tax:
         cases.append(
@@ -623,12 +1008,42 @@ def build_cases() -> list[dict[str, Any]]:
 
     # --- refund ---
     refunds = [
-        ("amazon", "Amazon.com <auto-confirm@amazon.com>", "Refund initiated for order 111-222", "A refund of $29.99 has been initiated."),
-        ("store", "Store <orders@shop.example>", "Refund of $64.00 has been issued", "Your return is complete — refund processing to original card."),
-        ("chargeback", "Chase Alerts <no.reply.alerts@chase.com>", "Charge reversed for merchant ACME", "A provisional credit of $88.00 posted for a disputed charge."),
-        ("airline", "United <united@united.com>", "Refund confirmation for canceled flight", "Refund of $430.00 for UA123 will return in 7–10 days."),
-        ("spotify", "Spotify <no-reply@spotify.com>", "Your refund was processed", "We refunded $10.99 for Premium."),
-        ("etsy", "Etsy <noreply@etsy.com>", "Your return is complete — refund processing", "Seller issued a refund for order #E991."),
+        (
+            "amazon",
+            "Amazon.com <auto-confirm@amazon.com>",
+            "Refund initiated for order 111-222",
+            "A refund of $29.99 has been initiated.",
+        ),
+        (
+            "store",
+            "Store <orders@shop.example>",
+            "Refund of $64.00 has been issued",
+            "Your return is complete — refund processing to original card.",
+        ),
+        (
+            "chargeback",
+            "Chase Alerts <no.reply.alerts@chase.com>",
+            "Charge reversed for merchant ACME",
+            "A provisional credit of $88.00 posted for a disputed charge.",
+        ),
+        (
+            "airline",
+            "United <united@united.com>",
+            "Refund confirmation for canceled flight",
+            "Refund of $430.00 for UA123 will return in 7–10 days.",
+        ),
+        (
+            "spotify",
+            "Spotify <no-reply@spotify.com>",
+            "Your refund was processed",
+            "We refunded $10.99 for Premium.",
+        ),
+        (
+            "etsy",
+            "Etsy <noreply@etsy.com>",
+            "Your return is complete — refund processing",
+            "Seller issued a refund for order #E991.",
+        ),
     ]
     for slug, sender, subject, body in refunds:
         cases.append(
@@ -650,14 +1065,54 @@ def build_cases() -> list[dict[str, Any]]:
 
     # --- hold / no existing fit ---
     holds = [
-        ("insurance", "InsureCo <policies@insure.example>", "Your home insurance renewal packet", "Please review renewal terms for policy H-9981."),
-        ("hoa", "HOA Board <board@hoa.example>", "Annual HOA meeting agenda and proxy form", "Please vote on the budget amendment."),
-        ("school", "School District <noreply@school.example>", "Parent-teacher conference signup is open", "Choose a 15-minute slot next week."),
-        ("medical", "Clinic <noreply@clinic.example>", "Lab results ready in patient portal", "New results are available to view securely."),
-        ("court", "County Court <noreply@courts.example>", "Jury summons — appear on Sep 15", "Bring photo ID to Courthouse Room 12."),
-        ("donation", "Charity <giving@nonprofit.example>", "Thank you for volunteering last Saturday", "You logged 4 hours at the food bank."),
-        ("pet", "Vet Clinic <noreply@vet.example>", "Annual vaccine reminder for Luna", "Rabies vaccine is due next month."),
-        ("gov_id", "DMV <noreply@dmv.example>", "Your REAL ID appointment confirmation", "Appointment Tuesday 10:20 AM. Bring documents list."),
+        (
+            "insurance",
+            "InsureCo <policies@insure.example>",
+            "Your home insurance renewal packet",
+            "Please review renewal terms for policy H-9981.",
+        ),
+        (
+            "hoa",
+            "HOA Board <board@hoa.example>",
+            "Annual HOA meeting agenda and proxy form",
+            "Please vote on the budget amendment.",
+        ),
+        (
+            "school",
+            "School District <noreply@school.example>",
+            "Parent-teacher conference signup is open",
+            "Choose a 15-minute slot next week.",
+        ),
+        (
+            "medical",
+            "Clinic <noreply@clinic.example>",
+            "Lab results ready in patient portal",
+            "New results are available to view securely.",
+        ),
+        (
+            "court",
+            "County Court <noreply@courts.example>",
+            "Jury summons — appear on Sep 15",
+            "Bring photo ID to Courthouse Room 12.",
+        ),
+        (
+            "donation",
+            "Charity <giving@nonprofit.example>",
+            "Thank you for volunteering last Saturday",
+            "You logged 4 hours at the food bank.",
+        ),
+        (
+            "pet",
+            "Vet Clinic <noreply@vet.example>",
+            "Annual vaccine reminder for Luna",
+            "Rabies vaccine is due next month.",
+        ),
+        (
+            "gov_id",
+            "DMV <noreply@dmv.example>",
+            "Your REAL ID appointment confirmation",
+            "Appointment Tuesday 10:20 AM. Bring documents list.",
+        ),
     ]
     for slug, sender, subject, body in holds:
         cases.append(

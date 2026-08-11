@@ -49,6 +49,9 @@ def _migrate_sqlite(engine: Engine) -> None:
 
 
 def init_db(settings: Settings | None = None) -> Engine:
+    # Ensure Phase 3 RAG table is registered on SQLModel.metadata.
+    from tagsmith.rag.store import RagExample  # noqa: F401
+
     engine = get_engine(settings)
     SQLModel.metadata.create_all(engine)
     _migrate_sqlite(engine)

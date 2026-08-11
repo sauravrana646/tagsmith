@@ -113,6 +113,15 @@ On approve: create Gmail label, insert taxonomy row, apply to the triggering mes
   `confidence_review=0.5`. Remaining misses are edge disambiguation, not threshold
   miscalibration — details in [EVALS.md](EVALS.md).
 
+## Phase 3 (RAG) — locked while on the Phase 3 branch
+
+- Few-shots via existing `examples=` / `category_hints=` seam (no new classifier API).
+- Default embedder is deterministic hashing (offline); store is SQLite `rag_examples`.
+- Sync retrieves k=5 labeled neighbors before LLM; stamps `source=rag` when used.
+- Confident applies + human review finals upsert into the store.
+- Measure lift with `tagsmith eval --rag` vs Phase 2 `tagsmith eval` baseline.
+- Do not claim RAG helped until both JSON reports are compared side by side.
+
 ## Explicit non-goals for this pass
 
 No LangGraph, no web UI, no vector DB, no MCP, and no empty placeholder modules for them.

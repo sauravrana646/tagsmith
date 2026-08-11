@@ -91,10 +91,13 @@ def build_user_prompt(
     catalog: str,
     char_limit: int,
     examples: Sequence[LabeledEmail] | None = None,
+    category_hints: str | None = None,
 ) -> str:
     parts = [
         "Active taxonomy:",
         catalog,
+        "",
+        category_hints or "",
         "",
         _examples_block(examples or []),
         "",
@@ -153,11 +156,12 @@ async def classify_email(
     catalog: str,
     settings: Settings,
     examples: Sequence[LabeledEmail] | None = None,
+    category_hints: str | None = None,
     agent: Any | None = None,
 ) -> ClassifyOutcome:
     """Classify one email.
 
-    `examples` is the Phase 3 RAG seam — accepted now, unused by callers in Phase 1/2.
+    `examples` / `category_hints` are the Phase 3 RAG injection points.
     """
     result_type = build_classification_model(label_keys)
     retries = max(1, int(settings.llm_output_retries))
@@ -175,6 +179,7 @@ async def classify_email(
         catalog=catalog,
         char_limit=settings.body_char_limit,
         examples=examples,
+        category_hints=category_hints,
     )
     log.info(
         "classify.llm.start",
