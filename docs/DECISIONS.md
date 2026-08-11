@@ -120,7 +120,9 @@ On approve: create Gmail label, insert taxonomy row, apply to the triggering mes
 - Sync retrieves k=5 labeled neighbors before LLM; stamps `source=rag` when used.
 - Confident applies + human review finals upsert into the store.
 - Measure lift with `tagsmith eval --rag` vs Phase 2 `tagsmith eval` baseline.
-- Do not claim RAG helped until both JSON reports are compared side by side.
+- Live leave-one-out RAG eval (DeepSeek, 109 cases): **accuracy 0.982** vs Phase 2
+  **0.972** (+0.010). Remaining 2 misses are holds, not mislabels. Keep hashing
+  embedder for now; hosted embeddings optional if real-inbox lift stalls.
 
 ## Explicit non-goals for this pass
 

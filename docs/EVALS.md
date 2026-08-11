@@ -124,6 +124,44 @@ Artifact: `evals/baseline_live.json` (local; re-run to refresh):
 uv run tagsmith eval --json-out evals/baseline_live.json
 ```
 
+## Phase 3 RAG baseline (recorded)
+
+Operator run on `feature/phase-3-rag` with the same DeepSeek model and golden set
+(`tagsmith eval --rag`, leave-one-out few-shots from expected labels):
+
+| Run | Mode | Accuracy | Misses |
+|-----|------|----------|--------|
+| Phase 2 reference | no RAG (prompt v2) | 0.972 (106/109) | 3 |
+| Phase 3 | `--rag` leave-one-out | **0.982 (107/109)** | 2 |
+
+Latest RAG metrics:
+
+| Metric | Value |
+|--------|------:|
+| Accuracy | **0.982** |
+| Rule hit rate | 0.266 |
+| LLM routing rate | 0.734 |
+| Proposal / hold rate | 0.092 / 0.092 |
+| Latency p50 / p95 | ~5.8s / ~19.4s |
+| Tokens in / out | 314910 / 17015 |
+
+**Lift vs Phase 2:** +0.010 accuracy (1 fewer miss). Both remaining misses are
+cautious holds (`got=None`, `route=hold_propose`, `source=rag`), not wrong labels:
+
+| Case | Expected | Got | Notes |
+|------|----------|-----|--------|
+| `gold_order_amazon2` | order-confirmation | hold | Over-cautious with RAG neighbors |
+| `gold_support_resolved` | support-ticket | hold | Resolved-ticket wording → hold |
+
+Trade-offs: prompt tokens and latency rose (few-shot injection), as expected.
+Hashing embedder is sufficient for this golden set; hosted embeddings remain optional.
+
+Artifact: `evals/baseline_rag.json` (local; re-run to refresh):
+
+```bash
+uv run tagsmith eval --rag --json-out evals/baseline_rag.json
+```
+
 ## Success criteria for “Phase 2 done”
 
 - [x] Golden set ≥ 100 labeled cases (diverse senders/labels) — synthetic seed; replace/augment with real inbox over time

@@ -50,10 +50,20 @@ TAGSMITH_RAG_CATEGORY_K=3
 TAGSMITH_RAG_EMBEDDING_DIM=256
 ```
 
+## Live result (recorded)
+
+| Mode | Accuracy | Misses |
+|------|----------|--------|
+| Phase 2 no-RAG (v2) | 0.972 | 3 |
+| Phase 3 `--rag` leave-one-out | **0.982** | 2 (both holds) |
+
+Details in [EVALS.md](EVALS.md). Hashing embedder delivered a clear +1pp lift; no
+hosted embedding swap required for Phase 3 merge readiness.
+
 ## Success criteria
 
 - [x] Example store + hashing embedder + retriever
 - [x] Wired into sync + review indexing
 - [x] `tagsmith eval --rag` leave-one-out harness
-- [ ] Live RAG vs no-RAG baseline numbers recorded in EVALS.md
-- [ ] Optional: upgrade embedder to a hosted model if hashing lift is weak
+- [x] Live RAG vs Phase 2 baseline numbers recorded in EVALS.md
+- [ ] Optional: upgrade embedder to a hosted model if hashing lift is weak (not needed yet)
