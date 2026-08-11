@@ -10,7 +10,7 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 APP_NAME = "tagsmith"
-PROMPT_VERSION = "v1"
+PROMPT_VERSION = "v2"
 
 # Load .env into os.environ so provider keys (OPENROUTER_API_KEY, OPENAI_API_KEY,
 # GOOGLE_API_KEY, …) are visible to Pydantic AI. Settings alone only consume TAGSMITH_*.

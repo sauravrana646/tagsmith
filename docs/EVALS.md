@@ -126,4 +126,30 @@ uv run tagsmith eval --json-out evals/baseline_live.json
 - [x] Live eval baseline recorded (above; optionally commit `evals/baseline_live.json`)
 - [x] Threshold tuning decision recorded (keep defaults; see above + DECISIONS.md)
 - [ ] Logfire (or OTel exporter) usable for a real sync run (optional)
-- [ ] Fix / document the 6 known golden misses (rules + prompt / expected labels)
+- [x] Address the 6 known golden misses (Chase refund rule + prompt v2 disambiguation)
+
+### How to fix golden-set misses (playbook)
+
+For each miss, pick **one** lever (don’t thrash all three):
+
+1. **Rule bug** (source=`rule`, wrong label)  
+   Tighten/add a builtin or user rule. Example: “Charge reversed” → `refund`, not `payment-sent`.
+
+2. **Prompt / taxonomy ambiguity** (source=`llm`, two labels both plausible)  
+   Add a disambiguation bullet to `SYSTEM_PROMPT` and/or clarify `seed.yaml` descriptions.  
+   Bump `PROMPT_VERSION` when the prompt changes, then re-run eval.
+
+3. **Wrong expected label** (model is right, golden is wrong)  
+   Edit `evals/golden_set.jsonl` (or `generate_golden_set.py` + regenerate).  
+   Only do this when you’d accept the model’s label in the real product.
+
+4. **Should be hold** (forced into a weak existing label)  
+   Keep `expected_label_key: null` + `expected_route: hold_propose`.  
+   Teach the model via prompt: “partial overlap ≠ fit; prefer null + proposed_new”.
+
+After any change:
+
+```bash
+uv run tagsmith eval --json-out evals/baseline_live.json
+# compare accuracy + which case_ids remain in misses
+```

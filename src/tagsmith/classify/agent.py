@@ -27,7 +27,8 @@ log = get_logger(__name__)
 SYSTEM_PROMPT = """You classify a single email into exactly one taxonomy label.
 
 Rules:
-- Choose label_key from the provided closed set whenever one fits — even partially.
+- Choose label_key from the provided closed set only when it is a *clear* fit.
+  Partial keyword overlap is not enough — prefer label_key=null + proposed_new.
 - label_key MUST be exactly one of the catalog keys, or JSON null. Never invent keys.
 - Do NOT set label_key to null if your rationale describes an existing category.
   Example: if the email is a completed purchase debit / "was paid" confirmation,
@@ -47,6 +48,23 @@ Rules:
 - List-Unsubscribe strongly suggests newsletter or promotion; use subject/body to pick.
 - Always return valid JSON matching the schema. proposed_new is REQUIRED when
   label_key is null.
+
+Disambiguation (frequent mistakes):
+- payment-sent = bank/wallet/card *debit alert* that money left the account.
+  Merchant trip/ride *receipts* (Uber/Lyft/airline e-ticket) → travel-booking,
+  not payment-sent.
+- refund = money returned / charge reversed / return credit notices.
+  A support-ticket thread that *mentions* a refund while helping the user stays
+  support-ticket (ticket/agent reply is the primary intent).
+- subscription-renewal = recurring SaaS/streaming/membership auto-renew.
+  Home/auto *insurance policy packets* are NOT subscription-renewal → null +
+  proposed_new (e.g. insurance-renewal).
+- security-alert = account login/password/MFA/device security events.
+  Court mail, jury summons, government notices are NOT security-alert → null +
+  proposed_new.
+- travel-booking = trips, flights, hotels, rides, itineraries, boarding passes.
+  DMV / REAL ID / license appointments are NOT travel-booking → null +
+  proposed_new (e.g. government-appointment).
 """
 
 
