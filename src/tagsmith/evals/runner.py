@@ -91,20 +91,31 @@ async def run_eval(
     rag_session = None
     rag_retriever = None
 
+    rag_tmpdir = None
     if use_rag and not rules_only:
+        import tempfile
+        from pathlib import Path
+
         from sqlmodel import Session
 
-        from tagsmith.db.session import get_engine, init_db, reset_engine
+        from tagsmith.db.session import init_db, reset_engine
         from tagsmith.rag.index import make_store
         from tagsmith.rag.retriever import Retriever
         from tagsmith.rag.store import example_text_from_email
 
+        # Use a temp file DB (not :memory:) so create_all + Session share one store.
+        # sqlite:///:memory: gives each engine/connection an empty private DB.
         reset_engine()
+        rag_tmpdir = tempfile.TemporaryDirectory(prefix="tagsmith-rag-eval-")
+        db_path = Path(rag_tmpdir.name) / "rag_eval.db"
         tmp_settings = settings.model_copy(
-            update={"database_url": "sqlite:///:memory:", "enable_rag": True}
+            update={
+                "database_url": f"sqlite:///{db_path}",
+                "enable_rag": True,
+            }
         )
-        init_db(tmp_settings)
-        rag_session = Session(get_engine(tmp_settings))
+        engine = init_db(tmp_settings)
+        rag_session = Session(engine)
         store = make_store(rag_session, tmp_settings)
         for other in cases:
             if other.expected_label_key is None:
@@ -248,6 +259,8 @@ async def run_eval(
             from tagsmith.db.session import reset_engine
 
             reset_engine()
+        if rag_tmpdir is not None:
+            rag_tmpdir.cleanup()
 
     report = compute_report(
         expected_keys=[r.expected_label_key for r in results],

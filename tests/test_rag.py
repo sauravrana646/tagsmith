@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from tagsmith.config import Settings
-from tagsmith.db.session import init_db
+from tagsmith.db.session import get_session, init_db, reset_engine
 from tagsmith.rag.embedder import HashingEmbedder, cosine_similarity
 from tagsmith.rag.index import make_store
 from tagsmith.rag.retriever import Retriever, format_category_hints
@@ -63,3 +65,22 @@ def test_example_text_from_email_truncates() -> None:
         body_chars=50,
     )
     assert len(meta["body_excerpt"]) == 50
+
+
+def test_rag_eval_bootstrap_creates_table(settings: Settings, tmp_path: Path) -> None:
+    """Regression: create_all must expose rag_examples before upsert."""
+    reset_engine()
+    db = tmp_path / "rag.db"
+    s = settings.model_copy(update={"database_url": f"sqlite:///{db}"})
+    init_db(s)
+    with get_session(s) as session:
+        store = make_store(session, s)
+        store.upsert(
+            gmail_id="x",
+            label_key="otp-verification",
+            sender="a",
+            subject="code",
+            body_excerpt="123",
+        )
+        assert store.count() == 1
+    reset_engine()
