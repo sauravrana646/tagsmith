@@ -49,6 +49,8 @@ class Settings(BaseSettings):
     needs_review_label: str = "needs-review"
     body_char_limit: int = 2000
     log_level: str = "INFO"
+    # How many times Pydantic AI may retry when model JSON fails schema validation.
+    llm_output_retries: int = 3
 
     # Phase 2 observability / cost estimates (optional).
     enable_logfire: bool = False

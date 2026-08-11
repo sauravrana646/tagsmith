@@ -2,15 +2,19 @@
 
 from __future__ import annotations
 
+import re
 import time
 from collections.abc import Sequence
 from typing import Any
 
-from pydantic_ai import Agent
+from pydantic_ai import Agent, AgentRetries
+from pydantic_ai.exceptions import UnexpectedModelBehavior
 
 from tagsmith.classify.outcome import ClassifyOutcome
 from tagsmith.classify.schema import (
+    Classification,
     LabeledEmail,
+    NewCategory,
     build_classification_model,
     to_classification,
 )
@@ -24,6 +28,7 @@ SYSTEM_PROMPT = """You classify a single email into exactly one taxonomy label.
 
 Rules:
 - Choose label_key from the provided closed set whenever one fits — even partially.
+- label_key MUST be exactly one of the catalog keys, or JSON null. Never invent keys.
 - Do NOT set label_key to null if your rationale describes an existing category.
   Example: if the email is a completed purchase debit / "was paid" confirmation,
   label_key must be payment-sent, not null.
@@ -36,10 +41,12 @@ Rules:
 - If you pick an existing label_key but confidence is below 0.5 (guessy), still set
   that label_key as your best guess AND also fill proposed_new with a better new
   category alternative for the human reviewer.
-- confidence is coarse triage from 0 to 1, not a calibrated probability.
+- confidence is a number from 0 to 1 (not a string).
 - rationale must be one sentence and must name the chosen label_key when set.
 - Prefer transactional meaning over marketing tone when both appear.
 - List-Unsubscribe strongly suggests newsletter or promotion; use subject/body to pick.
+- Always return valid JSON matching the schema. proposed_new is REQUIRED when
+  label_key is null.
 """
 
 
@@ -87,6 +94,35 @@ def _usage_tokens(result: Any) -> tuple[int | None, int | None]:
     )
 
 
+def _fallback_hold(email: NormalizedEmail, *, reason: str) -> Classification:
+    """Safe hold when the model cannot produce valid structured output."""
+    slug = re.sub(r"[^a-z0-9]+", "-", email.subject.lower()).strip("-")
+    parts = [p for p in slug.split("-") if p][:4]
+    slug = "-".join(parts) or "needs-human-review"
+    if slug in {"uncategorized-followup", "unknown", "other", "misc"}:
+        slug = "needs-human-review"
+    if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", slug):
+        slug = "needs-human-review"
+    try:
+        proposed = NewCategory(
+            suggested_key=slug,
+            description=f"Human should refine category for: {email.subject[:80]}",
+            why_no_existing_fit=reason[:500],
+        )
+    except ValueError:
+        proposed = NewCategory(
+            suggested_key="needs-human-review",
+            description=f"Human should refine category for: {email.subject[:80]}",
+            why_no_existing_fit=reason[:500],
+        )
+    return Classification(
+        label_key=None,
+        confidence=0.0,
+        rationale=f"Model output invalid; held for review. ({reason[:200]})",
+        proposed_new=proposed,
+    )
+
+
 async def classify_email(
     email: NormalizedEmail,
     *,
@@ -101,12 +137,14 @@ async def classify_email(
     `examples` is the Phase 3 RAG seam — accepted now, unused by callers in Phase 1/2.
     """
     result_type = build_classification_model(label_keys)
+    retries = max(1, int(settings.llm_output_retries))
     if agent is None:
         # Dynamic closed-set output model; Agent is intentionally loosely typed here.
         agent = Agent(
             settings.llm_model,
             output_type=result_type,
             system_prompt=SYSTEM_PROMPT,
+            retries=AgentRetries(output=retries, tools=1),
         )
 
     prompt = build_user_prompt(
@@ -128,7 +166,25 @@ async def classify_email(
         model=settings.llm_model,
         prompt_version=PROMPT_VERSION,
     ):
-        result = await agent.run(prompt)
+        try:
+            result = await agent.run(prompt)
+        except UnexpectedModelBehavior as exc:
+            latency_ms = (time.perf_counter() - started) * 1000.0
+            cause = getattr(exc, "__cause__", None)
+            detail = f"{exc}" + (f" | cause={cause}" if cause else "")
+            log.warning(
+                "classify.llm.invalid_output",
+                gmail_id=email.gmail_id,
+                error=detail,
+                latency_ms=round(latency_ms, 2),
+            )
+            return ClassifyOutcome(
+                classification=_fallback_hold(email, reason=detail),
+                input_tokens=None,
+                output_tokens=None,
+                latency_ms=latency_ms,
+            )
+
     latency_ms = (time.perf_counter() - started) * 1000.0
     classification = to_classification(result.output)
     input_tokens, output_tokens = _usage_tokens(result)

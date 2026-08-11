@@ -43,6 +43,7 @@ class SyncCounts:
     held: int = 0
     proposals: int = 0
     applied: int = 0
+    classify_errors: int = 0
 
     def as_dict(self) -> dict[str, int]:
         return {
@@ -55,6 +56,7 @@ class SyncCounts:
             "held": self.held,
             "proposals": self.proposals,
             "applied": self.applied,
+            "classify_errors": self.classify_errors,
         }
 
 
@@ -248,6 +250,13 @@ class SyncService:
             examples=None,
             blocked_keys=blocked,
         )
+        # Count model-schema fallbacks (held with confidence 0 + invalid-output rationale).
+        if (
+            result.source == "llm"
+            and result.classification.confidence == 0.0
+            and "Model output invalid" in result.classification.rationale
+        ):
+            counts.classify_errors += 1
         classification = result.classification
         route = result.route
         source = ClassificationSource.RULE if result.source == "rule" else ClassificationSource.LLM
