@@ -2,20 +2,21 @@
 
 from __future__ import annotations
 
+import time
 from collections.abc import Sequence
 from typing import Any
 
 from pydantic_ai import Agent
 
+from tagsmith.classify.outcome import ClassifyOutcome
 from tagsmith.classify.schema import (
-    Classification,
     LabeledEmail,
     build_classification_model,
     to_classification,
 )
 from tagsmith.config import PROMPT_VERSION, Settings
 from tagsmith.gmail.parser import NormalizedEmail
-from tagsmith.telemetry import get_logger
+from tagsmith.telemetry import get_logger, span
 
 log = get_logger(__name__)
 
@@ -73,6 +74,19 @@ def build_user_prompt(
     return "\n".join(p for p in parts if p is not None).strip() + "\n"
 
 
+def _usage_tokens(result: Any) -> tuple[int | None, int | None]:
+    usage_fn = getattr(result, "usage", None)
+    usage = usage_fn() if callable(usage_fn) else usage_fn
+    if usage is None:
+        return None, None
+    input_tokens = getattr(usage, "input_tokens", None)
+    output_tokens = getattr(usage, "output_tokens", None)
+    return (
+        int(input_tokens) if input_tokens is not None else None,
+        int(output_tokens) if output_tokens is not None else None,
+    )
+
+
 async def classify_email(
     email: NormalizedEmail,
     *,
@@ -81,10 +95,10 @@ async def classify_email(
     settings: Settings,
     examples: Sequence[LabeledEmail] | None = None,
     agent: Any | None = None,
-) -> Classification:
+) -> ClassifyOutcome:
     """Classify one email.
 
-    `examples` is the Phase 3 RAG seam — accepted now, unused by callers in Phase 1.
+    `examples` is the Phase 3 RAG seam — accepted now, unused by callers in Phase 1/2.
     """
     result_type = build_classification_model(label_keys)
     if agent is None:
@@ -107,13 +121,30 @@ async def classify_email(
         model=settings.llm_model,
         prompt_version=PROMPT_VERSION,
     )
-    result = await agent.run(prompt)
+    started = time.perf_counter()
+    with span(
+        "tagsmith.classify.llm",
+        gmail_id=email.gmail_id,
+        model=settings.llm_model,
+        prompt_version=PROMPT_VERSION,
+    ):
+        result = await agent.run(prompt)
+    latency_ms = (time.perf_counter() - started) * 1000.0
     classification = to_classification(result.output)
+    input_tokens, output_tokens = _usage_tokens(result)
     log.info(
         "classify.llm.done",
         gmail_id=email.gmail_id,
         label_key=classification.label_key,
         confidence=classification.confidence,
         has_proposal=classification.proposed_new is not None,
+        latency_ms=round(latency_ms, 2),
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
     )
-    return classification
+    return ClassifyOutcome(
+        classification=classification,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        latency_ms=latency_ms,
+    )

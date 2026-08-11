@@ -98,6 +98,16 @@ On approve: create Gmail label, insert taxonomy row, apply to the triggering mes
 - Merges to `main` are blocked by the aggregating **`quality-gate`** GitHub Actions check once branch protection requires it (setup steps in [CONTRIBUTING.md](CONTRIBUTING.md)).
 - Also enable GitHub native secret scanning + push protection when available.
 
+## Phase 2 (evals / observability) — locked while on the Phase 2 branch
+
+- Golden set lives at `evals/golden_set.jsonl`; grow to **100–200** hand-labeled cases before Phase 3.
+- Eval harness: `evals/run_eval.py` and `tagsmith eval` (same metrics: per-label P/R, routing rates, latency, tokens/cost).
+- Offline CI uses `--rules-only`; live LLM evals are operator-run with provider keys.
+- Review corrections export via `tagsmith eval-export-corrections` for golden-set harvesting.
+- Observability: optional Logfire (`TAGSMITH_ENABLE_LOGFIRE` + `LOGFIRE_TOKEN`); spans no-op when disabled.
+- LLM token counts persist on `classifications.tokens`; sync `runs.cost_estimate` when cost rates are configured.
+- Do **not** change confidence thresholds until a live eval baseline exists.
+
 ## Explicit non-goals for this pass
 
 No LangGraph, no web UI, no vector DB, no MCP, and no empty placeholder modules for them.

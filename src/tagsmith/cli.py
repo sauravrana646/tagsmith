@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from pathlib import Path
 
 import typer
 from rich.console import Console
@@ -22,7 +23,7 @@ from tagsmith.review.suggest import suggest_existing_label
 from tagsmith.services.review_ops import ReviewOps
 from tagsmith.services.sync import SyncService
 from tagsmith.taxonomy.registry import TaxonomyRegistry
-from tagsmith.telemetry import configure_logging, get_logger
+from tagsmith.telemetry import configure_logging, configure_observability, get_logger
 
 app = typer.Typer(
     name="tagsmith",
@@ -43,6 +44,7 @@ log = get_logger(__name__)
 def _settings() -> Settings:
     settings = get_settings()
     configure_logging(settings.log_level)
+    configure_observability(enabled=settings.enable_logfire)
     return settings
 
 
@@ -173,6 +175,62 @@ def sync(
             f"| {decision.get('label_key')} ({conf_s}) "
             f"| {decision.get('subject', '')[:70]}"
         )
+
+
+@app.command("eval")
+def eval_cmd(
+    golden: Path | None = None,
+    rules_only: bool = False,
+    json_out: Path | None = None,
+    enable_logfire: bool = typer.Option(
+        False,
+        "--logfire",
+        help="Enable Logfire tracing when LOGFIRE_TOKEN is set.",
+    ),
+) -> None:
+    """Run Phase 2 eval harness against the golden set.
+
+    Examples:
+      tagsmith eval --rules-only
+      tagsmith eval --golden evals/golden_set.jsonl --json-out /tmp/eval.json
+    """
+    from tagsmith.evals.runner import default_golden_path, format_report, run_eval
+
+    settings = _settings()
+    if enable_logfire:
+        configure_observability(enabled=True)
+    path = golden or default_golden_path()
+    try:
+        result = asyncio.run(run_eval(path, settings=settings, rules_only=rules_only))
+    except Exception as exc:
+        console.print(f"[red]eval failed: {exc}[/red]")
+        raise typer.Exit(1) from exc
+
+    console.print(format_report(result.report, cases=result.cases))
+    if json_out is not None:
+        import json
+
+        json_out.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "report": result.report.as_dict(),
+            "cases": [c.__dict__ for c in result.cases],
+        }
+        json_out.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        console.print(f"[green]wrote[/green] {json_out}")
+
+
+@app.command("eval-export-corrections")
+def eval_export_corrections(
+    out: Path = Path("evals/corrections_export.jsonl"),
+) -> None:
+    """Export local review corrections as golden-set candidates."""
+    from tagsmith.evals.export_corrections import export_corrections_jsonl
+
+    settings = _settings()
+    init_db(settings)
+    with get_session(settings) as session:
+        n = export_corrections_jsonl(session, out)
+    console.print(f"[green]exported {n}[/green] correction rows → {out}")
 
 
 @taxonomy_app.command("list")

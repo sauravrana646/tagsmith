@@ -50,6 +50,12 @@ class Settings(BaseSettings):
     body_char_limit: int = 2000
     log_level: str = "INFO"
 
+    # Phase 2 observability / cost estimates (optional).
+    enable_logfire: bool = False
+    # Rough USD cost used by eval reports when provider pricing is unknown.
+    cost_per_1k_input_tokens: float = 0.0
+    cost_per_1k_output_tokens: float = 0.0
+
     @property
     def needs_review_label_name(self) -> str:
         return f"{self.label_parent}/{self.needs_review_label}"

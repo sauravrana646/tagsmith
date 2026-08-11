@@ -9,8 +9,9 @@ It is both:
 1. a **usable mailbox assistant** you can run today, and  
 2. a **learning path** through structured LLM output, evals, RAG, and (later) MCP/SaaS.
 
-Phase **0 + 1** are implemented (Gmail plumbing, rules, classifier, apply/review, SQLite).  
-Later phases (evals, RAG, continuous sync/MCP, product) are planned — see [docs](docs/README.md).
+Phase **0 + 1** are on `main`. **Phase 2 (evals + observability)** is in progress on
+`cursor/phase-2-evals-observability` — see [docs/EVALS.md](docs/EVALS.md).  
+Later phases (RAG, continuous sync/MCP, product) remain planned — see [docs](docs/README.md).
 
 ---
 
@@ -38,6 +39,7 @@ Later phases (evals, RAG, continuous sync/MCP, product) are planned — see [doc
 - Numeric existing-label picker; LLM `proposed_new` shown when nothing fits
 - Idempotent sync; `--reprocess` escape hatch; negative examples if you remove an agent label
 - Offline tests + CI (lint, types, tests, Gitleaks secret scan, dependency audit, Bandit) with a `quality-gate` merge check
+- Phase 2: golden-set eval harness (`tagsmith eval`) + optional Logfire tracing
 
 ---
 

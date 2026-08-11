@@ -49,6 +49,9 @@ dev = [
   "pip-audit>=2.7.0",
   "bandit>=1.8.0",
 ]
+observability = [
+  "logfire>=3.0.0",
+]
 
 [tool.bandit]
 exclude_dirs = ["tests", ".venv"]
@@ -81,6 +84,7 @@ module = [
   "googleapiclient.*",
   "google_auth_oauthlib.*",
   "html2text.*",
+  "logfire.*",
 ]
 ignore_missing_imports = true
 

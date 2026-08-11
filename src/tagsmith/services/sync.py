@@ -27,7 +27,7 @@ from tagsmith.gmail.parser import NormalizedEmail, normalize_message
 from tagsmith.gmail.protocol import GmailGateway
 from tagsmith.review.queue import ReviewService
 from tagsmith.taxonomy.registry import TaxonomyRegistry
-from tagsmith.telemetry import get_logger
+from tagsmith.telemetry import get_logger, span
 
 log = get_logger(__name__)
 
@@ -332,6 +332,7 @@ class SyncService:
             source=source,
             model=None if source == ClassificationSource.RULE else self.settings.llm_model,
             prompt_version=None if source == ClassificationSource.RULE else PROMPT_VERSION,
+            tokens=result.total_tokens,
             applied_at=utcnow() if apply and not hold else None,
             needs_review=needs_review,
             review_status=ReviewStatus.PENDING if needs_review else None,
@@ -354,6 +355,8 @@ class SyncService:
                     else None
                 ),
                 "applied": bool(apply and not hold and label_key),
+                "tokens": result.total_tokens,
+                "latency_ms": result.latency_ms,
             }
         )
 
@@ -377,21 +380,42 @@ class SyncService:
         counts = SyncCounts()
         decisions: list[dict[str, Any]] = []
 
-        ids = self.gmail.list_message_ids(query=query, limit=limit)
-        counts.fetched = len(ids)
-        for gmail_id in ids:
-            raw = self.gmail.get_message(gmail_id)
-            email = normalize_message(raw, body_char_limit=self.settings.body_char_limit)
-            await self.process_email(
-                email,
-                apply=apply,
-                reprocess=reprocess,
-                counts=counts,
-                decisions=decisions,
-            )
+        with span(
+            "tagsmith.sync",
+            limit=limit,
+            apply=apply,
+            reprocess=reprocess,
+            query=query,
+        ):
+            ids = self.gmail.list_message_ids(query=query, limit=limit)
+            counts.fetched = len(ids)
+            for gmail_id in ids:
+                raw = self.gmail.get_message(gmail_id)
+                email = normalize_message(raw, body_char_limit=self.settings.body_char_limit)
+                await self.process_email(
+                    email,
+                    apply=apply,
+                    reprocess=reprocess,
+                    counts=counts,
+                    decisions=decisions,
+                )
 
         run.finished_at = datetime.now(UTC)
         run.counts_json = counts.as_dict()
+        # Rough run cost from LLM token totals recorded on decisions (when present).
+        token_total = 0
+        for decision in decisions:
+            t = decision.get("tokens")
+            if isinstance(t, int):
+                token_total += t
+        if token_total and (
+            self.settings.cost_per_1k_input_tokens or self.settings.cost_per_1k_output_tokens
+        ):
+            # Without per-side split on the run, use blended average of configured rates.
+            blended = (
+                self.settings.cost_per_1k_input_tokens + self.settings.cost_per_1k_output_tokens
+            ) / 2.0
+            run.cost_estimate = (token_total / 1000.0) * blended
         self.session.commit()
 
         return SyncResult(run_id=run.id, dry_run=not apply, counts=counts, decisions=decisions)
