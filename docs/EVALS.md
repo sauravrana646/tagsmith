@@ -1,6 +1,7 @@
 # Phase 2 — Evals & observability
 
-Status: **in progress on branch `cursor/phase-2-evals-observability`** (not merged until approved).
+Status: Phase 2 baselines live on `main`; Phase 3 RAG numbers recorded on
+`feature/phase-3-rag` (not merged until approved).
 
 ## Goals
 
