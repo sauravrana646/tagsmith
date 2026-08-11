@@ -108,11 +108,10 @@ On approve: create Gmail label, insert taxonomy row, apply to the triggering mes
 - Review corrections export via `tagsmith eval-export-corrections` for golden-set harvesting.
 - Observability: optional Logfire (`TAGSMITH_ENABLE_LOGFIRE` + `LOGFIRE_TOKEN`); spans no-op when disabled.
 - LLM token counts persist on `classifications.tokens`; sync `runs.cost_estimate` when cost rates are configured.
-- Live baseline (DeepSeek via OpenRouter on 109 golden cases): **accuracy 0.945**.
-  Decision: **keep** `confidence_apply=0.75` and `confidence_review=0.5` until a larger
-  real-inbox golden set exists. Known misses are category ambiguity / one over-broad
-  Chase rule (`gold_refund_chargeback`), not threshold miscalibration — details in
-  [EVALS.md](EVALS.md).
+- Live baseline (DeepSeek via OpenRouter on 109 golden cases): **accuracy 0.972**
+  after prompt v2 (was 0.945 on v1). Decision: **keep** `confidence_apply=0.75` and
+  `confidence_review=0.5`. Remaining misses are edge disambiguation, not threshold
+  miscalibration — details in [EVALS.md](EVALS.md).
 
 ## Explicit non-goals for this pass
 

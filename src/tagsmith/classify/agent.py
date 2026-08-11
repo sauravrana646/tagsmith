@@ -65,6 +65,11 @@ Disambiguation (frequent mistakes):
 - travel-booking = trips, flights, hotels, rides, itineraries, boarding passes.
   DMV / REAL ID / license appointments are NOT travel-booking → null +
   proposed_new (e.g. government-appointment).
+- tax-document = tax forms/transcripts/W-2/1099/GST filings and "tax transcript
+  is available" notices — these ARE tax-document, not a hold.
+- support-ticket = vendor helpdesk / ticket threads only.
+  Patient-portal lab results, volunteering thank-yous, school/HOA mail are NOT
+  support-ticket → null + proposed_new.
 """
 
 

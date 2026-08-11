@@ -87,34 +87,38 @@ LOGFIRE_TOKEN=...   # or rely on send_to_logfire=if-token-present
 
 ## Live baseline (recorded)
 
-Operator run on Phase 2 branch with `openrouter:deepseek/deepseek-v4-flash-0731`
+Operator runs on Phase 2 branch with `openrouter:deepseek/deepseek-v4-flash-0731`
 against `evals/golden_set.jsonl` (109 cases):
+
+| Run | Prompt | Accuracy | Misses |
+|-----|--------|----------|--------|
+| Initial | v1 | 0.945 (103/109) | 6 |
+| After disambiguation | v2 | **0.972 (106/109)** | 3 |
+
+Latest metrics (v2):
 
 | Metric | Value |
 |--------|------:|
-| Accuracy | **0.945** (103/109) |
+| Accuracy | **0.972** |
 | Rule hit rate | 0.266 |
 | LLM routing rate | 0.734 |
-| Proposal / hold rate | 0.046 |
-| Latency p50 / p95 | ~3.8s / ~11.6s |
-| Tokens in / out | 260111 / 15177 |
+| Proposal / hold rate | 0.064 / 0.073 |
+| Latency p50 / p95 | ~3.4s / ~8.6s |
+| Tokens in / out | 266305 / 9373 |
 
-**Misses (6):**
+**Remaining misses (3) after v2:**
 
-| Case | Expected | Got | Source |
+| Case | Expected | Got | Notes |
 |------|----------|-----|--------|
-| `gold_travel_uber` | travel-booking | payment-sent | llm |
-| `gold_support_billing` | support-ticket | refund | llm |
-| `gold_refund_chargeback` | refund | payment-sent | **rule** |
-| `gold_hold_insurance` | hold (None) | subscription-renewal | llm |
-| `gold_hold_court` | hold (None) | security-alert | llm |
-| `gold_hold_gov_id` | hold (None) | travel-booking | llm |
+| `gold_tax_1099` | tax-document | hold | Over-cautious; tax transcript *is* tax-document |
+| `gold_hold_medical` | hold | support-ticket | Lab portal ≠ support |
+| `gold_hold_donation` | hold | support-ticket | Volunteering thanks ≠ support |
 
-**Threshold decision:** keep defaults (`apply=0.75`, `review=0.5`) for now — overall
-accuracy is high; remaining work is label disambiguation / rule hygiene, not cutoff
-tuning. Revisit thresholds after adding ~50–100 real inbox corrections.
+**Threshold decision:** keep defaults (`apply=0.75`, `review=0.5`). Accuracy is high
+enough for a Phase 2 baseline; optional prompt tweaks for the last 3, then grow with
+real inbox corrections before Phase 3.
 
-Re-run and persist JSON:
+Artifact: `evals/baseline_live.json` (local; re-run to refresh):
 
 ```bash
 uv run tagsmith eval --json-out evals/baseline_live.json
