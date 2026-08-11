@@ -26,7 +26,10 @@ Each line is a `GoldenCase`:
 
 - `expected_label_key: null` → expect no existing label (hold / propose).
 - `expected_route` optional; when set, both label and route must match to score correct.
-- Seed today: ~19 cases (fixtures + synthetic). **Target: 100–200 hand-labeled real emails** before claiming RAG lift.
+- Seed today: **100+** synthetic but realistic cases across all 16 labels + holds
+  (`uv run python evals/generate_golden_set.py`). Real inbox labels can be merged via
+  `tagsmith eval-export-corrections`. **Live LLM baseline + threshold tuning are deferred**
+  until provider API keys are available in the environment.
 
 Grow the set by:
 
@@ -84,7 +87,7 @@ LOGFIRE_TOKEN=...   # or rely on send_to_logfire=if-token-present
 
 ## Success criteria for “Phase 2 done”
 
-- [ ] Golden set ≥ 100 labeled cases (diverse senders/labels)
-- [ ] Live eval baseline checked in as a JSON artifact or docs note
-- [ ] Threshold tuning decisions recorded in DECISIONS.md from eval data
+- [x] Golden set ≥ 100 labeled cases (diverse senders/labels) — synthetic seed; replace/augment with real inbox over time
+- [ ] Live eval baseline checked in as a JSON artifact or docs note (**deferred — needs LLM API keys**)
+- [ ] Threshold tuning decisions recorded in DECISIONS.md from eval data (**deferred — depends on live baseline**)
 - [ ] Logfire (or OTel exporter) usable for a real sync run

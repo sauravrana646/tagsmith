@@ -101,6 +101,8 @@ On approve: create Gmail label, insert taxonomy row, apply to the triggering mes
 ## Phase 2 (evals / observability) — locked while on the Phase 2 branch
 
 - Golden set lives at `evals/golden_set.jsonl`; grow to **100–200** hand-labeled cases before Phase 3.
+  Regenerator: `evals/generate_golden_set.py` (synthetic seed ≥100). Live LLM baseline + threshold
+  tuning wait on provider API keys (explicitly deferred).
 - Eval harness: `evals/run_eval.py` and `tagsmith eval` (same metrics: per-label P/R, routing rates, latency, tokens/cost).
 - Offline CI uses `--rules-only`; live LLM evals are operator-run with provider keys.
 - Review corrections export via `tagsmith eval-export-corrections` for golden-set harvesting.

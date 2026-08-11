@@ -66,7 +66,7 @@ async def test_run_eval_rules_only_on_repo_golden(settings: Settings) -> None:
     golden = Path("evals/golden_set.jsonl")
     assert golden.exists()
     result = await run_eval(golden, settings=settings, rules_only=True)
-    assert result.report.n_cases >= 10
+    assert result.report.n_cases >= 100
     # Fixture OTP/security/payment/newsletter should be rule hits.
     by_id = {c.case_id: c for c in result.cases}
     assert by_id["fixture_otp_github"].correct
@@ -101,13 +101,17 @@ def test_configure_observability_disabled_is_noop() -> None:
 def test_golden_set_jsonl_parses() -> None:
     path = Path("evals/golden_set.jsonl")
     cases = load_golden_set(path)
-    assert len(cases) >= 15
+    assert len(cases) >= 100
     # Every line is valid JSON with required keys
     for line in path.read_text(encoding="utf-8").splitlines():
         if not line.strip():
             continue
         obj = json.loads(line)
         assert "id" in obj and "message" in obj
+    labels = {c.expected_label_key for c in cases}
+    # All 16 seed keys plus explicit holds (None)
+    assert None in labels
+    assert len(labels - {None}) >= 16
 
 
 def test_classification_still_requires_proposal_when_null() -> None:
