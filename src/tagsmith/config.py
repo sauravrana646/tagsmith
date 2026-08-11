@@ -10,7 +10,7 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 APP_NAME = "tagsmith"
-PROMPT_VERSION = "v1"
+PROMPT_VERSION = "v2"
 
 # Load .env into os.environ so provider keys (OPENROUTER_API_KEY, OPENAI_API_KEY,
 # GOOGLE_API_KEY, …) are visible to Pydantic AI. Settings alone only consume TAGSMITH_*.
@@ -49,6 +49,14 @@ class Settings(BaseSettings):
     needs_review_label: str = "needs-review"
     body_char_limit: int = 2000
     log_level: str = "INFO"
+    # How many times Pydantic AI may retry when model JSON fails schema validation.
+    llm_output_retries: int = 3
+
+    # Phase 2 observability / cost estimates (optional).
+    enable_logfire: bool = False
+    # Rough USD cost used by eval reports when provider pricing is unknown.
+    cost_per_1k_input_tokens: float = 0.0
+    cost_per_1k_output_tokens: float = 0.0
 
     @property
     def needs_review_label_name(self) -> str:

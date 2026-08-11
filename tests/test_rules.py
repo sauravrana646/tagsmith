@@ -50,6 +50,47 @@ def test_amazon_pay_payment_rule(settings, session) -> None:
     assert hit.confidence is None
 
 
+def test_chase_charge_reversed_is_refund_not_payment(settings, session) -> None:
+    from tests.fixtures.messages import _msg
+
+    keys = {c.key for c in load_seed_categories()}
+    rules = load_rules(settings.rules_path, keys)
+    raw = _msg(
+        gmail_id="msg_chargeback",
+        thread_id="thr_chargeback",
+        sender="Chase Alerts <no.reply.alerts@chase.com>",
+        to="user@example.com",
+        subject="Charge reversed for merchant ACME",
+        date="Mon, 11 Aug 2025 23:00:00 +0000",
+        body_plain="A provisional credit of $88.00 posted for a disputed charge.",
+    )
+    hit = match_rules(normalize_message(raw), rules)
+    assert hit is not None
+    assert hit.label_key == "refund"
+
+
+def test_eval_case_result_as_dict_with_slots() -> None:
+    from tagsmith.evals.runner import EvalCaseResult
+
+    row = EvalCaseResult(
+        case_id="c1",
+        expected_label_key="refund",
+        predicted_label_key="refund",
+        correct=True,
+        source="rule",
+        route="apply",
+        confidence=None,
+        has_proposal=False,
+        latency_ms=1.0,
+        input_tokens=None,
+        output_tokens=None,
+        rationale="ok",
+    )
+    dumped = row.as_dict()
+    assert dumped["case_id"] == "c1"
+    assert dumped["correct"] is True
+
+
 def test_stale_rule_fails_loudly(settings, tmp_path) -> None:
     path = tmp_path / "rules.yaml"
     path.write_text(

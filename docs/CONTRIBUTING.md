@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for helping with Tagsmith. Phase 0/1 are in place; follow [DECISIONS.md](DECISIONS.md) and [DESIGN.md](DESIGN.md) so we don’t reopen settled product choices casually.
+Thanks for helping with Tagsmith. Phase 0/1 are on `main`; Phase 2 work lands on a feature branch until approved. Follow [DECISIONS.md](DECISIONS.md), [DESIGN.md](DESIGN.md), and [EVALS.md](EVALS.md).
 
 ## Development setup
 
@@ -8,6 +8,8 @@ Thanks for helping with Tagsmith. Phase 0/1 are in place; follow [DECISIONS.md](
 git clone https://github.com/sauravrana646/tagsmith.git
 cd tagsmith
 uv sync --group dev
+# optional tracing
+uv sync --group dev --group observability
 cp .env.example .env   # optional for local Gmail dogfood
 ```
 
@@ -20,6 +22,7 @@ uv run ruff check src tests
 uv run ruff format src tests
 uv run mypy src
 uv run pytest
+uv run tagsmith eval --rules-only
 uv export --frozen --no-emit-project --no-dev --no-hashes -o /tmp/requirements.txt
 uv run pip-audit -r /tmp/requirements.txt --strict
 uv run bandit -r src -ll -c pyproject.toml

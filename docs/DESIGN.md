@@ -1,6 +1,6 @@
 # Design document
 
-Status: **Phase 0 + Phase 1 implemented**  
+Status: **Phase 0 + Phase 1 on main; Phase 2 evals in progress (branch)**  
 Related: [PLAN.md](PLAN.md), [DECISIONS.md](DECISIONS.md), [PRIVACY.md](PRIVACY.md)
 
 ## 1. Goals

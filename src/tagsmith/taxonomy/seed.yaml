@@ -1,8 +1,9 @@
 categories:
   - key: payment-sent
     description: >-
-      Money leaving the user's account, including card charges, bank debits,
-      UPI/ACH payments, and payment confirmations for purchases already made.
+      Money leaving the user's account via bank/card/wallet debit alerts
+      (UPI/ACH/card charged). Not merchant trip receipts (those are travel-booking)
+      and not chargebacks/reversals (those are refund).
     exemplars:
       - "Payment of $42.50 to Uber was successful"
       - "You sent ₹1,200 via UPI"
@@ -28,8 +29,8 @@ categories:
 
   - key: subscription-renewal
     description: >-
-      Recurring subscription renewals or upcoming auto-renew notices for
-      SaaS, streaming, memberships — distinct from one-off order receipts.
+      Recurring SaaS/streaming/membership auto-renew notices — not insurance
+      policy packets, HOA dues, or one-off order receipts.
     exemplars:
       - "Your Netflix membership renews on April 1"
       - "GitHub Pro will renew for $4"
@@ -39,6 +40,7 @@ categories:
     description: >-
       Account security events that are not one-time codes: new sign-in,
       suspicious activity, password changes, device added, recovery updates.
+      Not court/jury mail or government appointments.
     exemplars:
       - "Security alert: new sign-in on Windows device"
       - "We noticed a new login to your Google Account"
@@ -73,8 +75,8 @@ categories:
 
   - key: travel-booking
     description: >-
-      Flights, hotels, trains, car rentals, and itinerary confirmations or
-      changes — boarding passes and reservation vouchers included.
+      Flights, hotels, trains, rideshares (Uber/Lyft receipts), car rentals,
+      itineraries, boarding passes. Not DMV/REAL ID/license appointments.
     exemplars:
       - "Your flight to SFO is confirmed"
       - "Hotel reservation at Marriott Downtown"
@@ -110,7 +112,8 @@ categories:
   - key: support-ticket
     description: >-
       Customer-support thread updates, ticket IDs, agent replies, and case
-      resolutions — not marketing or security alerts.
+      resolutions — even if the agent mentions issuing a refund. Standalone
+      refund/credit notices without a support thread are refund.
     exemplars:
       - "[Ticket #45821] We've received your request"
       - "Re: Help with billing — agent reply"

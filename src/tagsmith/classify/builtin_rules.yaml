@@ -21,7 +21,13 @@ rules:
   - name: chase-payment-sent
     label_key: payment-sent
     sender_regex: "(?i)@(?:alerts\\.)?chase\\.com"
-    subject_regex: "(?i)(payment sent|you paid|charge|debit|purchase)"
+    # Avoid matching chargebacks / "charge reversed" (those are refunds).
+    subject_regex: "(?i)(payment sent|you paid|(?<!reversed )charge(?! reversed)|debit|purchase)"
+
+  - name: chase-charge-reversed-refund
+    label_key: refund
+    sender_regex: "(?i)@(?:alerts\\.)?chase\\.com"
+    subject_regex: "(?i)(charge reversed|provisional credit|dispute.*credit|reversed for)"
 
   - name: chase-payment-received
     label_key: payment-received

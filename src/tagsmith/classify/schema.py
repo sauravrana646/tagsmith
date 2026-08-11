@@ -21,6 +21,8 @@ class NewCategory(BaseModel):
     @classmethod
     def validate_key(cls, value: str) -> str:
         value = value.strip().lower().replace("_", "-").replace(" ", "-")
+        value = re.sub(r"[^a-z0-9-]+", "", value)
+        value = re.sub(r"-{2,}", "-", value).strip("-")
         if not KEBAB_RE.match(value):
             raise ValueError("suggested_key must be kebab-case")
         if value in {"uncategorized-followup", "unknown", "other", "misc"}:
@@ -58,13 +60,32 @@ def build_classification_model(label_keys: list[str]) -> type[BaseModel]:
     """Build a Pydantic model whose label_key is a Literal closed set (+ None)."""
     if not label_keys:
         raise ValueError("label_keys must be non-empty")
+    # Include None inside the Literal so the JSON schema has a single enum+null,
+    # not a confusing `Literal[..., None] | None` double-optional.
     label_literal = Literal.__getitem__(tuple([*sorted(label_keys), None]))
 
     class DynamicClassification(BaseModel):
-        label_key: label_literal | None = None  # type: ignore[valid-type]
+        label_key: label_literal = None  # type: ignore[valid-type]
         confidence: float = Field(ge=0.0, le=1.0)
         rationale: str
         proposed_new: NewCategory | None = None
+
+        @field_validator("confidence", mode="before")
+        @classmethod
+        def coerce_confidence(cls, value: Any) -> Any:
+            if isinstance(value, str):
+                try:
+                    return float(value.strip())
+                except ValueError:
+                    return value
+            return value
+
+        @field_validator("label_key", mode="before")
+        @classmethod
+        def normalize_null_label(cls, value: Any) -> Any:
+            if value in ("", "null", "None", "none"):
+                return None
+            return value
 
         @model_validator(mode="after")
         def require_proposal_when_no_label(self) -> DynamicClassification:

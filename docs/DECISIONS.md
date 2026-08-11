@@ -98,6 +98,21 @@ On approve: create Gmail label, insert taxonomy row, apply to the triggering mes
 - Merges to `main` are blocked by the aggregating **`quality-gate`** GitHub Actions check once branch protection requires it (setup steps in [CONTRIBUTING.md](CONTRIBUTING.md)).
 - Also enable GitHub native secret scanning + push protection when available.
 
+## Phase 2 (evals / observability) — locked while on the Phase 2 branch
+
+- Golden set lives at `evals/golden_set.jsonl`; grow to **100–200** hand-labeled cases before Phase 3.
+  Regenerator: `evals/generate_golden_set.py` (synthetic seed ≥100). Live LLM baseline + threshold
+  tuning wait on provider API keys (explicitly deferred).
+- Eval harness: `evals/run_eval.py` and `tagsmith eval` (same metrics: per-label P/R, routing rates, latency, tokens/cost).
+- Offline CI uses `--rules-only`; live LLM evals are operator-run with provider keys.
+- Review corrections export via `tagsmith eval-export-corrections` for golden-set harvesting.
+- Observability: optional Logfire (`TAGSMITH_ENABLE_LOGFIRE` + `LOGFIRE_TOKEN`); spans no-op when disabled.
+- LLM token counts persist on `classifications.tokens`; sync `runs.cost_estimate` when cost rates are configured.
+- Live baseline (DeepSeek via OpenRouter on 109 golden cases): **accuracy 0.972**
+  after prompt v2 (was 0.945 on v1). Decision: **keep** `confidence_apply=0.75` and
+  `confidence_review=0.5`. Remaining misses are edge disambiguation, not threshold
+  miscalibration — details in [EVALS.md](EVALS.md).
+
 ## Explicit non-goals for this pass
 
 No LangGraph, no web UI, no vector DB, no MCP, and no empty placeholder modules for them.

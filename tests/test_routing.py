@@ -56,10 +56,40 @@ def test_new_category_key_normalization() -> None:
     assert n.suggested_key == "insurance-renewal"
 
 
-def test_new_category_rejects_placeholder() -> None:
-    with pytest.raises(ValueError, match="specific category"):
-        NewCategory(
-            suggested_key="uncategorized-followup",
-            description="x",
-            why_no_existing_fit="y",
+def test_new_category_strips_punctuation() -> None:
+    n = NewCategory(
+        suggested_key="Home Insurance!!",
+        description="renewal packets",
+        why_no_existing_fit="no insurance label",
+    )
+    assert n.suggested_key == "home-insurance"
+
+
+def test_dynamic_model_coerces_string_confidence() -> None:
+    from tagsmith.classify.schema import build_classification_model
+
+    model = build_classification_model(["promotion", "newsletter"])
+    obj = model.model_validate(
+        {
+            "label_key": "promotion",
+            "confidence": "0.91",
+            "rationale": "sale email",
+            "proposed_new": None,
+        }
+    )
+    assert obj.confidence == 0.91
+
+
+def test_dynamic_model_null_string_label_requires_proposal() -> None:
+    from tagsmith.classify.schema import build_classification_model
+
+    model = build_classification_model(["promotion"])
+    with pytest.raises(ValueError, match="proposed_new"):
+        model.model_validate(
+            {
+                "label_key": "null",
+                "confidence": 0.5,
+                "rationale": "no fit",
+                "proposed_new": None,
+            }
         )
