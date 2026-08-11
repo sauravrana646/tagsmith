@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
+import sys
+from collections.abc import Awaitable, Callable, Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, fields
 from pathlib import Path
 from typing import Any
@@ -19,6 +21,49 @@ from tagsmith.telemetry import get_logger, span
 log = get_logger(__name__)
 
 ClassifyFn = Callable[..., Awaitable[PipelineResult]]
+
+
+@contextmanager
+def _eval_progress(*, enabled: bool, total: int) -> Iterator[Callable[[str], None]]:
+    """Bottom-of-terminal progress bar showing done/total (e.g. 92/109)."""
+
+    if not enabled or total <= 0:
+        yield lambda _case_id: None
+        return
+
+    from rich.console import Console
+    from rich.progress import (
+        BarColumn,
+        MofNCompleteColumn,
+        Progress,
+        SpinnerColumn,
+        TextColumn,
+        TimeElapsedColumn,
+        TimeRemainingColumn,
+    )
+
+    console = Console(stderr=True)
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[bold]eval[/bold]"),
+        BarColumn(bar_width=28),
+        MofNCompleteColumn(),  # e.g. 92/109
+        TextColumn("•"),
+        TimeElapsedColumn(),
+        TextColumn("left"),
+        TimeRemainingColumn(),
+        TextColumn("[dim]{task.description}[/dim]"),
+        console=console,
+        transient=False,
+        refresh_per_second=10,
+    ) as progress:
+        task_id = progress.add_task("", total=total)
+
+        def advance(case_id: str) -> None:
+            progress.advance(task_id)
+            progress.update(task_id, description=case_id)
+
+        yield advance
 
 
 @dataclass(slots=True)
@@ -72,6 +117,7 @@ async def run_eval(
     rules_only: bool = False,
     use_rag: bool = False,
     classify_fn: ClassifyFn | None = None,
+    show_progress: bool | None = None,
 ) -> EvalRunResult:
     """Evaluate pipeline predictions against a golden JSONL set.
 
@@ -80,12 +126,17 @@ async def run_eval(
 
     `use_rag`: leave-one-out few-shots — index golden cases with expected labels,
     retrieve k examples excluding the current message (Phase 3).
+
+    `show_progress`: bottom progress bar with done/total (e.g. 92/109). Defaults
+    to on when stderr is a TTY.
     """
     cases = load_golden_set(golden_path)
     label_keys = _active_keys()
     catalog = _catalog()
     rules = load_rules(settings.rules_path, set(label_keys))
     runner = classify_fn or classify_with_routing
+    if show_progress is None:
+        show_progress = sys.stderr.isatty()
 
     results: list[EvalCaseResult] = []
     rag_session = None
@@ -150,108 +201,114 @@ async def run_eval(
             rules_only=rules_only,
             use_rag=use_rag,
         ):
-            for case in cases:
-                email = normalize_message(
-                    case.message,
-                    body_char_limit=settings.body_char_limit,
-                )
-                if rules_only:
-                    from tagsmith.classify.rules import match_rules
-                    from tagsmith.classify.schema import (
-                        Classification,
-                        NewCategory,
-                        route_classification,
+            with _eval_progress(enabled=show_progress, total=len(cases)) as tick:
+                for case in cases:
+                    email = normalize_message(
+                        case.message,
+                        body_char_limit=settings.body_char_limit,
                     )
-
-                    ruled = match_rules(email, rules)
-                    if ruled and ruled.label_key:
-                        pipeline = PipelineResult(
-                            classification=ruled,
-                            route=route_classification(
-                                ruled,
-                                apply_threshold=settings.confidence_apply,
-                                review_threshold=settings.confidence_review,
-                            ),
-                            source="rule",
+                    if rules_only:
+                        from tagsmith.classify.rules import match_rules
+                        from tagsmith.classify.schema import (
+                            Classification,
+                            NewCategory,
+                            route_classification,
                         )
-                    else:
-                        hold = Classification(
-                            label_key=None,
-                            confidence=0.0,
-                            rationale="rules-only eval: no rule matched",
-                            proposed_new=NewCategory(
-                                suggested_key="rules-only-miss",
-                                description="Placeholder for offline rules-only eval misses",
-                                why_no_existing_fit=(
-                                    "No builtin/user rule matched this golden case"
+
+                        ruled = match_rules(email, rules)
+                        if ruled and ruled.label_key:
+                            pipeline = PipelineResult(
+                                classification=ruled,
+                                route=route_classification(
+                                    ruled,
+                                    apply_threshold=settings.confidence_apply,
+                                    review_threshold=settings.confidence_review,
                                 ),
-                            ),
-                        )
-                        pipeline = PipelineResult(
-                            classification=hold,
-                            route="hold_propose",
-                            source="llm",
-                        )
-                else:
-                    examples = None
-                    category_hints = None
-                    if rag_retriever is not None:
-                        from tagsmith.rag.retriever import format_category_hints
-                        from tagsmith.rag.store import example_text_from_email
+                                source="rule",
+                            )
+                        else:
+                            hold = Classification(
+                                label_key=None,
+                                confidence=0.0,
+                                rationale="rules-only eval: no rule matched",
+                                proposed_new=NewCategory(
+                                    suggested_key="rules-only-miss",
+                                    description=(
+                                        "Placeholder for offline rules-only eval misses"
+                                    ),
+                                    why_no_existing_fit=(
+                                        "No builtin/user rule matched this golden case"
+                                    ),
+                                ),
+                            )
+                            pipeline = PipelineResult(
+                                classification=hold,
+                                route="hold_propose",
+                                source="llm",
+                            )
+                    else:
+                        examples = None
+                        category_hints = None
+                        if rag_retriever is not None:
+                            from tagsmith.rag.retriever import format_category_hints
+                            from tagsmith.rag.store import example_text_from_email
 
-                        query = example_text_from_email(
-                            sender=email.sender,
-                            subject=email.subject,
-                            body_text=email.body_text,
-                        )["text"]
-                        rag_ctx = rag_retriever.retrieve(
-                            query,
-                            exclude_gmail_ids={email.gmail_id},
-                        )
-                        examples = rag_ctx.examples or None
-                        category_hints = format_category_hints(rag_ctx.category_hints) or None
+                            query = example_text_from_email(
+                                sender=email.sender,
+                                subject=email.subject,
+                                body_text=email.body_text,
+                            )["text"]
+                            rag_ctx = rag_retriever.retrieve(
+                                query,
+                                exclude_gmail_ids={email.gmail_id},
+                            )
+                            examples = rag_ctx.examples or None
+                            category_hints = (
+                                format_category_hints(rag_ctx.category_hints) or None
+                            )
 
-                    pipeline = await runner(
-                        email,
-                        rules=rules,
-                        label_keys=label_keys,
-                        catalog=catalog,
-                        settings=settings,
-                        examples=examples,
-                        category_hints=category_hints,
-                        blocked_keys=None,
+                        pipeline = await runner(
+                            email,
+                            rules=rules,
+                            label_keys=label_keys,
+                            catalog=catalog,
+                            settings=settings,
+                            examples=examples,
+                            category_hints=category_hints,
+                            blocked_keys=None,
+                        )
+
+                    predicted = pipeline.classification.label_key
+                    expected = case.expected_label_key
+                    correct = predicted == expected
+                    if case.expected_route is not None:
+                        correct = correct and pipeline.route == case.expected_route
+
+                    case_result = EvalCaseResult(
+                        case_id=case.id,
+                        expected_label_key=expected,
+                        predicted_label_key=predicted,
+                        correct=correct,
+                        source=pipeline.source,
+                        route=pipeline.route,
+                        confidence=pipeline.classification.confidence,
+                        has_proposal=pipeline.classification.proposed_new is not None,
+                        latency_ms=pipeline.latency_ms,
+                        input_tokens=pipeline.input_tokens,
+                        output_tokens=pipeline.output_tokens,
+                        rationale=pipeline.classification.rationale,
                     )
-
-                predicted = pipeline.classification.label_key
-                expected = case.expected_label_key
-                correct = predicted == expected
-                if case.expected_route is not None:
-                    correct = correct and pipeline.route == case.expected_route
-
-                case_result = EvalCaseResult(
-                    case_id=case.id,
-                    expected_label_key=expected,
-                    predicted_label_key=predicted,
-                    correct=correct,
-                    source=pipeline.source,
-                    route=pipeline.route,
-                    confidence=pipeline.classification.confidence,
-                    has_proposal=pipeline.classification.proposed_new is not None,
-                    latency_ms=pipeline.latency_ms,
-                    input_tokens=pipeline.input_tokens,
-                    output_tokens=pipeline.output_tokens,
-                    rationale=pipeline.classification.rationale,
-                )
-                results.append(case_result)
-                log.info(
-                    "eval.case",
-                    case_id=case.id,
-                    expected=expected,
-                    predicted=predicted,
-                    correct=correct,
-                    source=pipeline.source,
-                    route=pipeline.route,
-                )
+                    results.append(case_result)
+                    log.info(
+                        "eval.case",
+                        case_id=case.id,
+                        expected=expected,
+                        predicted=predicted,
+                        correct=correct,
+                        source=pipeline.source,
+                        route=pipeline.route,
+                    )
+                    tick(case.id)
     finally:
         if rag_session is not None:
             rag_session.close()
