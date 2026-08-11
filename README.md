@@ -10,7 +10,7 @@ It is both:
 2. a **learning path** through structured LLM output, evals, RAG, and (later) MCP/SaaS.
 
 Phase **0–2** are on `main` (Gmail plumbing, rules, classifier, review, evals).  
-**Phase 3 (RAG few-shots)** is in progress on `cursor/phase-3-rag` — see [docs/RAG.md](docs/RAG.md).  
+**Phase 3 (RAG few-shots)** is in progress on `feature/phase-3-rag` — see [docs/RAG.md](docs/RAG.md).  
 Later phases (continuous sync/MCP, product UI) remain planned — see [docs](docs/README.md).
 
 ---

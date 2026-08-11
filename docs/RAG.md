@@ -1,6 +1,6 @@
 # Phase 3 — RAG few-shot retrieval
 
-Status: **in progress on branch `cursor/phase-3-rag`** (not merged until approved).
+Status: **in progress on branch `feature/phase-3-rag`** (not merged until approved).
 
 ## Goal
 
