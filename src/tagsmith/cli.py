@@ -33,9 +33,11 @@ app = typer.Typer(
 labels_app = typer.Typer(help="Gmail label helpers")
 taxonomy_app = typer.Typer(help="Local taxonomy helpers")
 review_app = typer.Typer(help="Review proposals and medium-confidence labels")
+rag_app = typer.Typer(help="Phase 3 RAG example index")
 app.add_typer(labels_app, name="labels")
 app.add_typer(taxonomy_app, name="taxonomy")
 app.add_typer(review_app, name="review")
+app.add_typer(rag_app, name="rag")
 
 console = Console()
 log = get_logger(__name__)
@@ -181,6 +183,11 @@ def sync(
 def eval_cmd(
     golden: Path | None = None,
     rules_only: bool = False,
+    use_rag: bool = typer.Option(
+        False,
+        "--rag/--no-rag",
+        help="Phase 3: leave-one-out few-shot examples from the golden set.",
+    ),
     json_out: Path | None = None,
     enable_logfire: bool = typer.Option(
         False,
@@ -188,11 +195,12 @@ def eval_cmd(
         help="Enable Logfire tracing when LOGFIRE_TOKEN is set.",
     ),
 ) -> None:
-    """Run Phase 2 eval harness against the golden set.
+    """Run eval harness against the golden set.
 
     Examples:
       tagsmith eval --rules-only
-      tagsmith eval --golden evals/golden_set.jsonl --json-out /tmp/eval.json
+      tagsmith eval --json-out evals/baseline_live.json
+      tagsmith eval --rag --json-out evals/baseline_rag.json
     """
     from tagsmith.evals.runner import default_golden_path, format_report, run_eval
 
@@ -201,7 +209,9 @@ def eval_cmd(
         configure_observability(enabled=True)
     path = golden or default_golden_path()
     try:
-        result = asyncio.run(run_eval(path, settings=settings, rules_only=rules_only))
+        result = asyncio.run(
+            run_eval(path, settings=settings, rules_only=rules_only, use_rag=use_rag)
+        )
     except Exception as exc:
         console.print(f"[red]eval failed: {exc}[/red]")
         raise typer.Exit(1) from exc
@@ -227,6 +237,33 @@ def eval_export_corrections(
     with get_session(settings) as session:
         n = export_corrections_jsonl(session, out)
     console.print(f"[green]exported {n}[/green] correction rows → {out}")
+
+
+@rag_app.command("status")
+def rag_status() -> None:
+    """Show how many labeled examples are indexed for RAG."""
+    from tagsmith.rag.index import make_store
+
+    settings = _settings()
+    init_db(settings)
+    with get_session(settings) as session:
+        n = make_store(session, settings).count()
+    console.print(
+        f"RAG examples indexed: [bold]{n}[/bold] "
+        f"(enable_rag={settings.enable_rag}, k={settings.rag_example_k})"
+    )
+
+
+@rag_app.command("reindex")
+def rag_reindex() -> None:
+    """Rebuild the RAG example index from labeled SQLite messages."""
+    from tagsmith.rag.index import reindex_from_db
+
+    settings = _settings()
+    init_db(settings)
+    with get_session(settings) as session:
+        n = reindex_from_db(session, settings)
+    console.print(f"[green]reindexed {n}[/green] labeled examples into RAG store")
 
 
 @taxonomy_app.command("list")

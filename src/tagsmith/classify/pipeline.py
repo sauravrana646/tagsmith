@@ -1,4 +1,4 @@
-"""Rules → LLM → threshold routing for a single email."""
+"""Rules → LLM/RAG → threshold routing for a single email."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from tagsmith.telemetry import get_logger, span
 log = get_logger(__name__)
 
 Route = Literal["apply", "apply_with_review", "hold_propose"]
-Source = Literal["rule", "llm"]
+Source = Literal["rule", "llm", "rag"]
 
 
 @dataclass(slots=True)
@@ -27,6 +27,7 @@ class PipelineResult:
     input_tokens: int | None = None
     output_tokens: int | None = None
     latency_ms: float | None = None
+    rag_example_count: int = 0
 
     @property
     def total_tokens(self) -> int | None:
@@ -40,7 +41,6 @@ async def _coerce_outcome(raw: Classification | ClassifyOutcome | Any) -> Classi
         return raw
     if isinstance(raw, Classification):
         return ClassifyOutcome(classification=raw)
-    # Defensive: some stubs may return a model dump-like object.
     if hasattr(raw, "classification"):
         return raw  # type: ignore[no-any-return]
     raise TypeError(f"Unexpected classify_email return type: {type(raw)!r}")
@@ -54,9 +54,11 @@ async def classify_with_routing(
     catalog: str,
     settings: Settings,
     examples: list[LabeledEmail] | None = None,
+    category_hints: str | None = None,
     blocked_keys: set[str] | None = None,
 ) -> PipelineResult:
     blocked = blocked_keys or set()
+    example_list = list(examples or [])
 
     with span("tagsmith.classify.pipeline", gmail_id=email.gmail_id):
         ruled = match_rules(email, rules)
@@ -82,12 +84,12 @@ async def classify_with_routing(
                 label_keys=label_keys,
                 catalog=catalog,
                 settings=settings,
-                examples=examples,
+                examples=example_list,
+                category_hints=category_hints,
             )
         )
         classification = outcome.classification
         if classification.label_key in blocked:
-            # Treat blocked (user-removed) prediction as no-fit.
             classification = classification.model_copy(
                 update={
                     "label_key": None,
@@ -103,21 +105,24 @@ async def classify_with_routing(
             apply_threshold=settings.confidence_apply,
             review_threshold=settings.confidence_review,
         )
+        source: Source = "rag" if example_list else "llm"
         log.info(
             "classify.route",
             gmail_id=email.gmail_id,
-            source="llm",
+            source=source,
             route=route,
             label_key=classification.label_key,
             confidence=classification.confidence,
             latency_ms=outcome.latency_ms,
             tokens=outcome.total_tokens,
+            rag_examples=len(example_list),
         )
         return PipelineResult(
             classification=classification,
             route=route,
-            source="llm",
+            source=source,
             input_tokens=outcome.input_tokens,
             output_tokens=outcome.output_tokens,
             latency_ms=outcome.latency_ms,
+            rag_example_count=len(example_list),
         )

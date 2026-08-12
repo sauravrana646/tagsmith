@@ -46,6 +46,26 @@ class ReviewOps:
         self.queue = ReviewService(session)
         self.taxonomy = TaxonomyRegistry(session, settings)
 
+    def _index_for_rag(self, message: Message, label_key: str) -> None:
+        if not self.settings.enable_rag:
+            return
+        from tagsmith.rag.index import make_store
+        from tagsmith.rag.store import example_text_from_email
+
+        payload = dict(message.payload_json or {})
+        meta = example_text_from_email(
+            sender=str(payload.get("sender") or message.sender),
+            subject=str(payload.get("subject") or message.subject),
+            body_text=str(payload.get("body_text") or ""),
+        )
+        make_store(self.session, self.settings).upsert(
+            gmail_id=message.gmail_id,
+            label_key=label_key,
+            sender=meta["sender"],
+            subject=meta["subject"],
+            body_excerpt=meta["body_excerpt"],
+        )
+
     def list_proposals(self) -> list[ProposalView]:
         out: list[ProposalView] = []
         for proposal in self.queue.list_pending_proposals():
@@ -141,6 +161,7 @@ class ReviewOps:
         self.session.add(record)
         self.session.commit()
         self.session.refresh(record)
+        self._index_for_rag(message, label_key)
         log.info("held.assigned_existing", gmail_id=gmail_id, label_key=label_key)
         return record
 
@@ -208,6 +229,7 @@ class ReviewOps:
         self.session.add(record)
         self.session.commit()
         self.session.refresh(record)
+        self._index_for_rag(message, suggested_key)
         log.info("held.created_category", gmail_id=gmail_id, key=suggested_key)
         return record
 
@@ -384,6 +406,7 @@ class ReviewOps:
         message.updated_at = utcnow()
         self.session.commit()
         self.session.refresh(record)
+        self._index_for_rag(message, final)
         return record
 
     def change_label(
@@ -441,6 +464,7 @@ class ReviewOps:
         )
         self.session.commit()
         self.session.refresh(record)
+        self._index_for_rag(message, new_key)
         return record
 
     def reject_and_propose(

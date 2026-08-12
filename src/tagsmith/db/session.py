@@ -23,17 +23,20 @@ _SQLITE_COLUMN_MIGRATIONS: list[tuple[str, str, str]] = [
 
 def get_engine(settings: Settings | None = None, *, echo: bool = False) -> Engine:
     global _engine
-    if _engine is not None and settings is None:
-        return _engine
     if settings is None:
+        if _engine is not None:
+            return _engine
         from tagsmith.config import get_settings
 
         settings = get_settings()
+
     url = settings.database_url
+    if _engine is not None and str(_engine.url) == url:
+        return _engine
+
     connect_args = {"check_same_thread": False} if url.startswith("sqlite") else {}
     engine = create_engine(url, echo=echo, connect_args=connect_args)
-    if settings is None or _engine is None:
-        _engine = engine
+    _engine = engine
     return engine
 
 
@@ -49,6 +52,9 @@ def _migrate_sqlite(engine: Engine) -> None:
 
 
 def init_db(settings: Settings | None = None) -> Engine:
+    # Ensure Phase 3 RAG table is registered on SQLModel.metadata.
+    from tagsmith.rag.store import RagExample  # noqa: F401
+
     engine = get_engine(settings)
     SQLModel.metadata.create_all(engine)
     _migrate_sqlite(engine)
@@ -57,6 +63,8 @@ def init_db(settings: Settings | None = None) -> Engine:
 
 def reset_engine() -> None:
     global _engine
+    if _engine is not None:
+        _engine.dispose()
     _engine = None
 
 

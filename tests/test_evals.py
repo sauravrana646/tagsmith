@@ -65,7 +65,7 @@ def test_load_golden_set_roundtrip(tmp_path: Path) -> None:
 async def test_run_eval_rules_only_on_repo_golden(settings: Settings) -> None:
     golden = Path("evals/golden_set.jsonl")
     assert golden.exists()
-    result = await run_eval(golden, settings=settings, rules_only=True)
+    result = await run_eval(golden, settings=settings, rules_only=True, show_progress=False)
     assert result.report.n_cases >= 100
     # Fixture OTP/security/payment/newsletter should be rule hits.
     by_id = {c.case_id: c for c in result.cases}

@@ -58,6 +58,12 @@ class Settings(BaseSettings):
     cost_per_1k_input_tokens: float = 0.0
     cost_per_1k_output_tokens: float = 0.0
 
+    # Phase 3 RAG
+    enable_rag: bool = True
+    rag_example_k: int = 5
+    rag_category_k: int = 3
+    rag_embedding_dim: int = 256
+
     @property
     def needs_review_label_name(self) -> str:
         return f"{self.label_parent}/{self.needs_review_label}"

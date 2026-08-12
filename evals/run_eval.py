@@ -38,6 +38,11 @@ def main() -> int:
         help="Skip LLM; unmatched cases count as hold misses (offline CI).",
     )
     parser.add_argument(
+        "--rag",
+        action="store_true",
+        help="Phase 3 leave-one-out few-shot RAG from the golden set.",
+    )
+    parser.add_argument(
         "--json-out",
         type=Path,
         default=None,
@@ -59,6 +64,7 @@ def main() -> int:
             args.golden,
             settings=settings,
             rules_only=args.rules_only,
+            use_rag=args.rag,
         )
     )
     print(format_report(result.report, cases=result.cases))
