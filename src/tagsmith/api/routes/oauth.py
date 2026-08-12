@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
-from fastapi.responses import RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlmodel import Session, select
 
 from tagsmith.api.auth.web_oauth import (
@@ -73,14 +73,14 @@ def auth_debug(settings: Settings = Depends(settings_dep)) -> dict[str, Any]:
     return oauth_debug_info(settings)
 
 
-@router.get("/login")
+@router.get("/login", response_model=None)
 def login(
     request: Request,
     session: Session = Depends(session_dep),
     settings: Settings = Depends(settings_dep),
     prompt: str = Query("select_account", description="select_account | consent | none"),
     force: bool = Query(False, description="Force Google account picker even if signed in"),
-) -> RedirectResponse:
+) -> RedirectResponse | HTMLResponse:
     """Start Google OAuth, or bounce home if a valid session cookie already exists."""
     existing = _tenant_from_request(request, session)
     if existing is not None and not force:
@@ -90,7 +90,31 @@ def login(
     try:
         url, state = make_authorize_url(settings, prompt=prompt)
     except RuntimeError as exc:
-        raise HTTPException(500, str(exc)) from exc
+        import html as html_lib
+
+        dash = settings.web_app_url.rstrip("/")
+        debug = settings.api_public_base_url.rstrip("/") + "/auth/debug"
+        safe = html_lib.escape(str(exc))
+        return HTMLResponse(
+            status_code=500,
+            content=f"""<!doctype html>
+<html><head><meta charset="utf-8"><title>Tagsmith sign-in</title>
+<style>
+  body{{font-family:system-ui,sans-serif;max-width:40rem;margin:3rem auto;
+    padding:0 1rem;color:#171717;line-height:1.5}}
+  code{{background:#f5f5f5;padding:.1rem .35rem;border-radius:4px}}
+  a.btn{{display:inline-block;margin-top:1rem;padding:.55rem .9rem;
+    background:#171717;color:#fff;border-radius:6px;text-decoration:none;font-weight:600}}
+  .box{{border:1px solid #e5e5e5;border-radius:8px;padding:1rem;background:#fafafa}}
+</style></head><body>
+  <h1>Sign-in not configured</h1>
+  <div class="box"><p>{safe}</p></div>
+  <p>For local review you can keep using the dashboard with a desktop token
+  (<code>uv run tagsmith auth</code>) — web Google sign-in is optional.</p>
+  <a class="btn" href="{dash}">Back to dashboard</a>
+  <p><a href="{debug}">Auth debug</a></p>
+</body></html>""",
+        )
     response = RedirectResponse(url)
     response.set_cookie("oauth_state", state, httponly=True, samesite="lax", max_age=600, path="/")
     return response
