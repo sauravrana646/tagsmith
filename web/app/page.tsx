@@ -49,8 +49,10 @@ export default function HomePage() {
     <>
       <h1>Review queue</h1>
       <p className="muted">
-        Human gate for held messages and proposals. Mutations stay dry-run unless the API is
-        called with <code>apply=true</code>.
+        Human gate for held messages and proposals. Local review lists load from SQLite
+        without Sign in. Use Sign in only when you need web OAuth for API mutations.
+        If Google hangs, open <strong>Auth debug</strong> and confirm a{" "}
+        <em>Web application</em> client + redirect URI.
       </p>
       {error && <p className="error">{error}</p>}
       <div className="grid">

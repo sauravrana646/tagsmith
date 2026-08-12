@@ -13,6 +13,7 @@ from tagsmith.api.auth.web_oauth import (
     exchange_code,
     fetch_userinfo,
     make_authorize_url,
+    oauth_debug_info,
 )
 from tagsmith.api.deps import session_dep, settings_dep
 from tagsmith.config import Settings
@@ -21,10 +22,19 @@ from tagsmith.db.models import Tenant, utcnow
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
+@router.get("/debug")
+def auth_debug(settings: Settings = Depends(settings_dep)) -> dict[str, Any]:
+    """Print OAuth config checklist (no secrets). Open this if Google hangs."""
+    return oauth_debug_info(settings)
+
+
 @router.get("/login")
-def login(settings: Settings = Depends(settings_dep)) -> RedirectResponse:
+def login(
+    settings: Settings = Depends(settings_dep),
+    prompt: str = Query("select_account", description="select_account | consent | none"),
+) -> RedirectResponse:
     try:
-        url, state = make_authorize_url(settings)
+        url, state = make_authorize_url(settings, prompt=prompt)
     except RuntimeError as exc:
         raise HTTPException(500, str(exc)) from exc
     response = RedirectResponse(url)

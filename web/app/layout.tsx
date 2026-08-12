@@ -12,7 +12,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <header className="top">
           <strong>Tagsmith</strong>
-          <span className="muted">review dashboard</span>
+          <span className="muted">review dashboard · sign-in optional for local review</span>
+          <a
+            className="link"
+            href={`${process.env.NEXT_PUBLIC_API_BASE || "http://127.0.0.1:8080"}/auth/debug`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Auth debug
+          </a>
           <a
             className="link"
             href={`${process.env.NEXT_PUBLIC_API_BASE || "http://127.0.0.1:8080"}/auth/login`}
