@@ -200,115 +200,114 @@ async def run_eval(
             n_cases=len(cases),
             rules_only=rules_only,
             use_rag=use_rag,
-        ):
-            with _eval_progress(enabled=show_progress, total=len(cases)) as tick:
-                for case in cases:
-                    email = normalize_message(
-                        case.message,
-                        body_char_limit=settings.body_char_limit,
+        ), _eval_progress(enabled=show_progress, total=len(cases)) as tick:
+            for case in cases:
+                email = normalize_message(
+                    case.message,
+                    body_char_limit=settings.body_char_limit,
+                )
+                if rules_only:
+                    from tagsmith.classify.rules import match_rules
+                    from tagsmith.classify.schema import (
+                        Classification,
+                        NewCategory,
+                        route_classification,
                     )
-                    if rules_only:
-                        from tagsmith.classify.rules import match_rules
-                        from tagsmith.classify.schema import (
-                            Classification,
-                            NewCategory,
-                            route_classification,
-                        )
 
-                        ruled = match_rules(email, rules)
-                        if ruled and ruled.label_key:
-                            pipeline = PipelineResult(
-                                classification=ruled,
-                                route=route_classification(
-                                    ruled,
-                                    apply_threshold=settings.confidence_apply,
-                                    review_threshold=settings.confidence_review,
-                                ),
-                                source="rule",
-                            )
-                        else:
-                            hold = Classification(
-                                label_key=None,
-                                confidence=0.0,
-                                rationale="rules-only eval: no rule matched",
-                                proposed_new=NewCategory(
-                                    suggested_key="rules-only-miss",
-                                    description=(
-                                        "Placeholder for offline rules-only eval misses"
-                                    ),
-                                    why_no_existing_fit=(
-                                        "No builtin/user rule matched this golden case"
-                                    ),
-                                ),
-                            )
-                            pipeline = PipelineResult(
-                                classification=hold,
-                                route="hold_propose",
-                                source="llm",
-                            )
+                    ruled = match_rules(email, rules)
+                    if ruled and ruled.label_key:
+                        pipeline = PipelineResult(
+                            classification=ruled,
+                            route=route_classification(
+                                ruled,
+                                apply_threshold=settings.confidence_apply,
+                                review_threshold=settings.confidence_review,
+                            ),
+                            source="rule",
+                        )
                     else:
-                        examples = None
-                        category_hints = None
-                        if rag_retriever is not None:
-                            from tagsmith.rag.retriever import format_category_hints
-                            from tagsmith.rag.store import example_text_from_email
+                        hold = Classification(
+                            label_key=None,
+                            confidence=0.0,
+                            rationale="rules-only eval: no rule matched",
+                            proposed_new=NewCategory(
+                                suggested_key="rules-only-miss",
+                                description=(
+                                    "Placeholder for offline rules-only eval misses"
+                                ),
+                                why_no_existing_fit=(
+                                    "No builtin/user rule matched this golden case"
+                                ),
+                            ),
+                        )
+                        pipeline = PipelineResult(
+                            classification=hold,
+                            route="hold_propose",
+                            source="llm",
+                        )
+                else:
+                    examples = None
+                    category_hints = None
+                    if rag_retriever is not None:
+                        from tagsmith.rag.retriever import format_category_hints
+                        from tagsmith.rag.store import example_text_from_email
 
-                            query = example_text_from_email(
-                                sender=email.sender,
-                                subject=email.subject,
-                                body_text=email.body_text,
-                            )["text"]
-                            rag_ctx = rag_retriever.retrieve(
-                                query,
-                                exclude_gmail_ids={email.gmail_id},
-                            )
-                            examples = rag_ctx.examples or None
-                            category_hints = (
-                                format_category_hints(rag_ctx.category_hints) or None
-                            )
-
-                        pipeline = await runner(
-                            email,
-                            rules=rules,
-                            label_keys=label_keys,
-                            catalog=catalog,
-                            settings=settings,
-                            examples=examples,
-                            category_hints=category_hints,
-                            blocked_keys=None,
+                        query = example_text_from_email(
+                            sender=email.sender,
+                            subject=email.subject,
+                            body_text=email.body_text,
+                        )["text"]
+                        rag_ctx = rag_retriever.retrieve(
+                            query,
+                            exclude_gmail_ids={email.gmail_id},
+                        )
+                        examples = rag_ctx.examples or None
+                        category_hints = (
+                            format_category_hints(rag_ctx.category_hints) or None
                         )
 
-                    predicted = pipeline.classification.label_key
-                    expected = case.expected_label_key
-                    correct = predicted == expected
-                    if case.expected_route is not None:
-                        correct = correct and pipeline.route == case.expected_route
+                    pipeline = await runner(
+                        email,
+                        rules=rules,
+                        label_keys=label_keys,
+                        catalog=catalog,
+                        settings=settings,
+                        examples=examples,
+                        category_hints=category_hints,
+                        blocked_keys=None,
+                    )
 
-                    case_result = EvalCaseResult(
-                        case_id=case.id,
-                        expected_label_key=expected,
-                        predicted_label_key=predicted,
-                        correct=correct,
-                        source=pipeline.source,
-                        route=pipeline.route,
-                        confidence=pipeline.classification.confidence,
-                        has_proposal=pipeline.classification.proposed_new is not None,
-                        latency_ms=pipeline.latency_ms,
-                        input_tokens=pipeline.input_tokens,
-                        output_tokens=pipeline.output_tokens,
-                        rationale=pipeline.classification.rationale,
-                    )
-                    results.append(case_result)
-                    log.info(
-                        "eval.case",
-                        case_id=case.id,
-                        expected=expected,
-                        predicted=predicted,
-                        correct=correct,
-                        source=pipeline.source,
-                        route=pipeline.route,
-                    )
-                    tick(case.id)
+                predicted = pipeline.classification.label_key
+                expected = case.expected_label_key
+                correct = predicted == expected
+                if case.expected_route is not None:
+                    correct = correct and pipeline.route == case.expected_route
+
+                case_result = EvalCaseResult(
+                    case_id=case.id,
+                    expected_label_key=expected,
+                    predicted_label_key=predicted,
+                    correct=correct,
+                    source=pipeline.source,
+                    route=pipeline.route,
+                    confidence=pipeline.classification.confidence,
+                    has_proposal=pipeline.classification.proposed_new is not None,
+                    latency_ms=pipeline.latency_ms,
+                    input_tokens=pipeline.input_tokens,
+                    output_tokens=pipeline.output_tokens,
+                    rationale=pipeline.classification.rationale,
+                )
+                results.append(case_result)
+                log.info(
+                    "eval.case",
+                    case_id=case.id,
+                    expected=expected,
+                    predicted=predicted,
+                    correct=correct,
+                    source=pipeline.source,
+                    route=pipeline.route,
+                )
+                tick(case.id)
     finally:
         if rag_session is not None:
             rag_session.close()
