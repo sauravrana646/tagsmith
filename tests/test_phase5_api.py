@@ -35,3 +35,15 @@ def test_api_health_and_plans(settings: Settings, monkeypatch) -> None:  # type:
     plans = client.get("/api/billing/plans")
     assert plans.status_code == 200
     assert any(p["id"] == "free" for p in plans.json())
+
+    status = client.get("/api/status")
+    assert status.status_code == 200
+    assert "gmail_authenticated" in status.json()
+
+    labels = client.get("/api/taxonomy/labels")
+    assert labels.status_code == 200
+    assert len(labels.json()) >= 16
+
+    summary = client.get("/api/review/summary")
+    assert summary.status_code == 200
+    assert set(summary.json()) >= {"held", "needs_review", "proposals"}

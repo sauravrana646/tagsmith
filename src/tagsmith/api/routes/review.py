@@ -19,27 +19,35 @@ router = APIRouter(prefix="/api/review", tags=["review"])
 
 class AssignBody(BaseModel):
     label_key: str
-    apply: bool = False
+    apply: bool = True
 
 
 class ProposeBody(BaseModel):
     suggested_key: str
     description: str
     why: str = ""
-    apply: bool = False
+    apply: bool = True
 
 
 class ApproveBody(BaseModel):
-    apply: bool = False
+    apply: bool = True
     key_override: str | None = None
     description_override: str | None = None
+
+
+class ConfirmBody(BaseModel):
+    apply: bool = True
+
+
+class ChangeBody(BaseModel):
+    label_key: str = Field(min_length=1)
+    apply: bool = True
 
 
 def _ops_readonly(
     session: Session = Depends(session_dep),
     settings: Settings = Depends(settings_dep),
 ) -> ReviewOps:
-    # List endpoints only touch SQLite; avoid requiring Gmail credentials.
     return ReviewOps(session, FakeGmail(), settings)
 
 
@@ -49,6 +57,14 @@ def _ops(
     gmail: GmailClient = Depends(gmail_dep),
 ) -> ReviewOps:
     return ReviewOps(session, gmail, settings)
+
+
+def _body_excerpt(payload: dict[str, Any] | None, limit: int = 280) -> str:
+    if not payload:
+        return ""
+    text = str(payload.get("body_text") or payload.get("snippet") or "")
+    text = " ".join(text.split())
+    return text[:limit] + ("…" if len(text) > limit else "")
 
 
 @router.get("/summary")
@@ -72,8 +88,10 @@ def list_proposals(ops: ReviewOps = Depends(_ops_readonly)) -> list[dict[str, An
                 "suggested_key": view.proposal.suggested_key,
                 "description": view.proposal.description,
                 "rationale": view.proposal.rationale,
+                "why_no_existing_fit": view.proposal.why_no_existing_fit,
                 "subject": msg.subject if msg else "",
                 "sender": msg.sender if msg else "",
+                "body_excerpt": _body_excerpt(dict(msg.payload_json) if msg else None),
             }
         )
     return out
@@ -90,7 +108,9 @@ def list_held(ops: ReviewOps = Depends(_ops_readonly)) -> list[dict[str, Any]]:
                 "sender": message.sender,
                 "predicted_key": record.predicted_key if record else None,
                 "proposed_key": record.proposed_key if record else None,
+                "proposed_description": record.proposed_description if record else None,
                 "rationale": record.rationale if record else "",
+                "body_excerpt": _body_excerpt(dict(message.payload_json)),
             }
         )
     return out
@@ -108,6 +128,7 @@ def list_needs_review(ops: ReviewOps = Depends(_ops_readonly)) -> list[dict[str,
                 "predicted_key": record.predicted_key,
                 "confidence": record.confidence,
                 "rationale": record.rationale,
+                "body_excerpt": _body_excerpt(dict(message.payload_json)),
             }
         )
     return out
@@ -152,7 +173,7 @@ def propose_held(
 @router.post("/proposals/{proposal_id}/approve")
 async def approve_proposal(
     proposal_id: int,
-    body: ApproveBody = ApproveBody(),
+    body: ApproveBody,
     ops: ReviewOps = Depends(_ops),
 ) -> dict[str, Any]:
     try:
@@ -173,24 +194,52 @@ async def approve_proposal(
     }
 
 
-@router.post("/needs-review/{gmail_id}/confirm")
-def confirm_needs_review(
-    gmail_id: str,
-    apply: bool = False,
-    ops: ReviewOps = Depends(_ops),
+@router.post("/proposals/{proposal_id}/reject")
+def reject_proposal(
+    proposal_id: int,
+    ops: ReviewOps = Depends(_ops_readonly),
 ) -> dict[str, Any]:
     try:
-        ops.confirm_label(gmail_id, apply=apply)
+        proposal = ops.reject_proposal(proposal_id)
     except KeyError as exc:
         raise HTTPException(404, str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
-    return {"gmail_id": gmail_id, "action": "confirm", "applied": apply}
+    return {"proposal_id": proposal.id, "status": proposal.status.value}
 
 
-class ChangeBody(BaseModel):
-    label_key: str = Field(min_length=1)
-    apply: bool = False
+@router.post("/proposals/{proposal_id}/assign")
+def assign_proposal_existing(
+    proposal_id: int,
+    body: AssignBody,
+    ops: ReviewOps = Depends(_ops),
+) -> dict[str, Any]:
+    try:
+        record = ops.assign_existing_label(proposal_id, body.label_key, apply=body.apply)
+    except KeyError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    return {
+        "proposal_id": proposal_id,
+        "label_key": record.label_key,
+        "applied": body.apply,
+    }
+
+
+@router.post("/needs-review/{gmail_id}/confirm")
+def confirm_needs_review(
+    gmail_id: str,
+    body: ConfirmBody,
+    ops: ReviewOps = Depends(_ops),
+) -> dict[str, Any]:
+    try:
+        ops.confirm_label(gmail_id, apply=body.apply)
+    except KeyError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    return {"gmail_id": gmail_id, "action": "confirm", "applied": body.apply}
 
 
 @router.post("/needs-review/{gmail_id}/change")

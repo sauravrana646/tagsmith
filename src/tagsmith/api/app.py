@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from tagsmith import __version__
-from tagsmith.api.routes import billing, health, oauth, review, sync
+from tagsmith.api.routes import billing, health, oauth, review, status, sync, taxonomy
 from tagsmith.config import get_settings
 from tagsmith.db.session import init_db
 from tagsmith.telemetry import configure_logging
@@ -43,9 +43,11 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(health.router)
+    app.include_router(status.router)
     app.include_router(oauth.router)
     app.include_router(review.router)
     app.include_router(sync.router)
+    app.include_router(taxonomy.router)
     app.include_router(billing.router)
 
     web_dist = Path(__file__).resolve().parents[3] / "web" / "out"

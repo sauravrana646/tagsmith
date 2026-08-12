@@ -1,96 +1,113 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
+import { api } from "@/lib/api";
+import { useApplyPreference } from "@/components/Shell";
 
 type Summary = { proposals: number; needs_review: number; held: number };
-type Held = {
-  gmail_id: string;
-  subject: string;
-  sender: string;
-  predicted_key: string | null;
-  proposed_key: string | null;
-  rationale: string;
+type SyncResult = {
+  run_id: number | null;
+  dry_run: boolean;
+  counts: Record<string, number>;
 };
 
-const API = process.env.NEXT_PUBLIC_API_BASE || "http://127.0.0.1:8080";
-
-export default function HomePage() {
+export default function OverviewPage() {
+  const apply = useApplyPreference();
   const [summary, setSummary] = useState<Summary | null>(null);
-  const [held, setHeld] = useState<Held[]>([]);
+  const [limit, setLimit] = useState(25);
+  const [incremental, setIncremental] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  async function refresh() {
+    setSummary(await api<Summary>("/api/review/summary"));
+  }
+
   useEffect(() => {
-    async function load() {
-      try {
-        const [s, h] = await Promise.all([
-          fetch(`${API}/api/review/summary`, { credentials: "include" }).then((r) => {
-            if (!r.ok) throw new Error(`summary ${r.status}`);
-            return r.json();
-          }),
-          fetch(`${API}/api/review/held`, { credentials: "include" }).then((r) => {
-            if (!r.ok) throw new Error(`held ${r.status}`);
-            return r.json();
-          }),
-        ]);
-        setSummary(s);
-        setHeld(h);
-      } catch (err) {
-        setError(
-          err instanceof Error
-            ? `${err.message}. Start the API with \`uv run tagsmith api\` and allow CORS/local access.`
-            : "failed to load",
-        );
-      }
-    }
-    void load();
+    void refresh().catch((e: Error) => setError(e.message));
   }, []);
 
+  async function runSync(e: FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const result = await api<SyncResult>("/api/sync/run", {
+        method: "POST",
+        body: JSON.stringify({
+          limit,
+          apply,
+          incremental,
+          reprocess: false,
+        }),
+      });
+      setMessage(
+        `${result.dry_run ? "Dry-run" : "Applied"} sync #${result.run_id ?? "—"} · ` +
+          Object.entries(result.counts)
+            .filter(([, v]) => v)
+            .map(([k, v]) => `${k}=${v}`)
+            .join(" · "),
+      );
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Sync failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
-    <>
-      <h1>Review queue</h1>
-      <p className="muted">
-        Human gate for held messages and proposals. Local review lists load from SQLite
-        without Sign in. Use Sign in only when you need web OAuth for API mutations.
-        If Google hangs, open <strong>Auth debug</strong> and confirm a{" "}
-        <em>Web application</em> client + redirect URI.
-      </p>
-      {error && <p className="error">{error}</p>}
+    <div className="stack">
       <div className="grid">
         <div className="card">
-          <h2>Proposals</h2>
-          <div className="n">{summary?.proposals ?? "—"}</div>
+          <h2>Held</h2>
+          <div className="n">{summary?.held ?? "—"}</div>
         </div>
         <div className="card">
           <h2>Needs review</h2>
           <div className="n">{summary?.needs_review ?? "—"}</div>
         </div>
         <div className="card">
-          <h2>Held</h2>
-          <div className="n">{summary?.held ?? "—"}</div>
+          <h2>Proposals</h2>
+          <div className="n">{summary?.proposals ?? "—"}</div>
         </div>
       </div>
-      <section className="list">
-        <h2>Held messages</h2>
-        {held.length === 0 && <p className="muted">No held messages (or API offline).</p>}
-        {held.map((item) => (
-          <article className="item" key={item.gmail_id}>
-            <div>
-              <strong>{item.subject || "(no subject)"}</strong>
-            </div>
-            <div className="muted">{item.sender}</div>
-            <div>
-              predicted <code>{item.predicted_key ?? "null"}</code>
-              {item.proposed_key ? (
-                <>
-                  {" "}
-                  · proposed <code>{item.proposed_key}</code>
-                </>
-              ) : null}
-            </div>
-            <div className="muted">{item.rationale}</div>
-          </article>
-        ))}
-      </section>
-    </>
+
+      <form className="panel" onSubmit={runSync}>
+        <strong>Sync unread mail</strong>
+        <p className="muted tiny">
+          Pulls from Gmail using your desktop token, classifies, and{" "}
+          {apply ? "applies labels" : "dry-runs only"}. Toggle Apply in the sidebar.
+        </p>
+        <div className="row">
+          <label className="muted tiny">
+            Limit{" "}
+            <input
+              className="input"
+              type="number"
+              min={1}
+              max={200}
+              value={limit}
+              onChange={(e) => setLimit(Number(e.target.value))}
+            />
+          </label>
+          <label className="apply-toggle" style={{ padding: "0.45rem 0.7rem" }}>
+            <input
+              type="checkbox"
+              checked={incremental}
+              onChange={(e) => setIncremental(e.target.checked)}
+            />
+            Incremental (historyId)
+          </label>
+          <button className="btn" type="submit" disabled={busy}>
+            {busy ? "Running…" : apply ? "Sync & apply" : "Sync dry-run"}
+          </button>
+        </div>
+        {message && <div className="success">{message}</div>}
+        {error && <div className="error">{error}</div>}
+      </form>
+    </div>
   );
 }
