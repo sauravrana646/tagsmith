@@ -36,7 +36,10 @@ uv run tagsmith api
 # Dashboard (separate terminal)
 cd web && npm install && npm run dev
 # open http://127.0.0.1:3000
+# if port 3000 is busy: npm run dev:3001  and set TAGSMITH_WEB_APP_URL=http://127.0.0.1:3001
 ```
+
+After Google login, the API redirects to `TAGSMITH_WEB_APP_URL` (default `http://127.0.0.1:3000`), not the API root.
 
 Dry-run remains the default on mutating endpoints (`apply=false`).
 

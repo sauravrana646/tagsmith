@@ -73,6 +73,8 @@ class Settings(BaseSettings):
     api_host: str = "127.0.0.1"
     api_port: int = 8080
     api_public_base_url: str = "http://127.0.0.1:8080"
+    # Where OAuth should send the browser after login (Next.js dashboard).
+    web_app_url: str = "http://127.0.0.1:3000"
     # Fernet key material (any passphrase; hashed to 32 bytes). Required for tenant tokens.
     token_encryption_key: str = ""
     # Web OAuth client (can reuse desktop JSON; prefer a Web application client).

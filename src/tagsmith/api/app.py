@@ -6,7 +6,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from tagsmith import __version__
@@ -34,6 +34,7 @@ def create_app() -> FastAPI:
             "http://127.0.0.1:3001",
             "http://localhost:3001",
             settings.api_public_base_url,
+            settings.web_app_url,
         ],
         allow_origin_regex=r"http://(127\.0\.0\.1|localhost):\d+",
         allow_credentials=True,
@@ -54,6 +55,24 @@ def create_app() -> FastAPI:
         @app.get("/")
         async def dashboard_index() -> FileResponse:
             return FileResponse(web_dist / "index.html")
+    else:
+        dashboard = settings.web_app_url.rstrip("/")
+
+        @app.get("/")
+        async def api_root() -> HTMLResponse:
+            return HTMLResponse(
+                f"""<!doctype html>
+<html><body style="font-family:system-ui;padding:2rem;max-width:40rem">
+  <h1>Tagsmith API</h1>
+  <p>OAuth succeeded. The UI runs on the Next.js app, not this port.</p>
+  <p><a href="{dashboard}/?auth=ok">Open dashboard → {dashboard}</a></p>
+  <p>Docs: <a href="/docs">/docs</a> · Health: <a href="/health">/health</a></p>
+</body></html>"""
+            )
+
+        @app.get("/go")
+        async def go_dashboard() -> RedirectResponse:
+            return RedirectResponse(dashboard + "/?auth=ok")
 
     @app.middleware("http")
     async def attach_tenant_cookie(request: Request, call_next):  # type: ignore[no-untyped-def]

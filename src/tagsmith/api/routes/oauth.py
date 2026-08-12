@@ -70,7 +70,9 @@ def callback(
     session.commit()
     session.refresh(tenant)
 
-    redirect = RedirectResponse("/?auth=ok")
+    # Send the browser back to the Next.js dashboard (not the API root).
+    dest = settings.web_app_url.rstrip("/") + "/?auth=ok"
+    redirect = RedirectResponse(dest)
     redirect.set_cookie(
         "tagsmith_tenant",
         str(tenant.id),

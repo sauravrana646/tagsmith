@@ -23,11 +23,11 @@ export default function HomePage() {
     async function load() {
       try {
         const [s, h] = await Promise.all([
-          fetch(`${API}/api/review/summary`).then((r) => {
+          fetch(`${API}/api/review/summary`, { credentials: "include" }).then((r) => {
             if (!r.ok) throw new Error(`summary ${r.status}`);
             return r.json();
           }),
-          fetch(`${API}/api/review/held`).then((r) => {
+          fetch(`${API}/api/review/held`, { credentials: "include" }).then((r) => {
             if (!r.ok) throw new Error(`held ${r.status}`);
             return r.json();
           }),
