@@ -1,7 +1,7 @@
 # Design document
 
-Status: **Phase 0–3 on main; Phase 4+5 in progress (branch `feature/phase-4-5-ops-product`)**  
-Related: [PLAN.md](PLAN.md), [DECISIONS.md](DECISIONS.md), [PRIVACY.md](PRIVACY.md), [OPS.md](OPS.md), [PRODUCT.md](PRODUCT.md)
+Status: **Phase 0–3 on main; Phase 4+5 product foundation in progress; Phase 6 SaaS deferred**  
+Related: [PLAN.md](PLAN.md), [DECISIONS.md](DECISIONS.md), [PRIVACY.md](PRIVACY.md), [OPS.md](OPS.md), [PRODUCT.md](PRODUCT.md), [SAAS.md](SAAS.md)
 
 ## 1. Goals
 
@@ -10,8 +10,9 @@ Related: [PLAN.md](PLAN.md), [DECISIONS.md](DECISIONS.md), [PRIVACY.md](PRIVACY.
 3. **Unit economics:** rules catch repetitive mail; LLM handles the long tail.
 4. **Learning path:** structured output → evals → RAG → MCP/API without rewriting the core.
 
-Non-goals for early phases: LangGraph, empty stub modules. Phase 4 adds MCP + incremental sync;
-Phase 5 adds FastAPI + dashboard (see OPS.md / PRODUCT.md).
+Non-goals for early phases: LangGraph, empty stub modules. Phase 4 adds MCP + local
+incremental sync; Phase 5 adds FastAPI + dashboard foundation; Phase 6 is hosted
+SaaS (see OPS.md / PRODUCT.md / SAAS.md).
 
 ## 2. High-level architecture
 

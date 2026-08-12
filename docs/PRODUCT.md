@@ -1,12 +1,15 @@
-# Phase 5 — Product API & dashboard
+# Phase 5 — Product foundation (API & dashboard)
 
 Status: **in progress on branch `feature/phase-4-5-ops-product`** (not merged until approved).
 
 ## Goal
 
-Wrap the existing service layer with a FastAPI backend, web OAuth, encrypted
-tenant refresh tokens, a Next.js review dashboard, and billing hooks — without
-rewriting classify/sync/review logic.
+Wrap the existing service layer with a FastAPI backend, web OAuth for the
+operator, encrypted refresh tokens, a Next.js review dashboard, and billing
+**hooks** — without rewriting classify/sync/review logic.
+
+This is the **local / single-user product API**, not the public SaaS launch.
+Hosted multi-tenant work lives in **Phase 6** — see [SAAS.md](SAAS.md).
 
 ## What’s included in this pass
 
@@ -18,9 +21,9 @@ rewriting classify/sync/review logic.
 | Web OAuth | `/auth/login`, `/auth/callback`, `/auth/me` |
 | Token crypto | Fernet via `TAGSMITH_TOKEN_ENCRYPTION_KEY` |
 | Tenants | `tenants` table (`email`, encrypted refresh token, `plan`) |
-| Billing | `/api/billing/plans` + Stripe webhook receiver |
-| Dashboard | `web/` Next.js static export (optional `web/out`) |
-| Postgres | `TAGSMITH_DATABASE_URL=postgresql+psycopg://...` (+ `uv sync --group product`) |
+| Billing hooks | `/api/billing/plans` + Stripe webhook receiver |
+| Dashboard | `web/` Next.js scaffold |
+| DB | SQLite default; optional Postgres URL for experiments |
 
 ## Local run
 
@@ -37,7 +40,7 @@ cd web && npm install && npm run dev
 
 Dry-run remains the default on mutating endpoints (`apply=false`).
 
-## Still open (post-merge hardening)
+## Deferred to Phase 6 (SaaS final)
 
 - [ ] Google OAuth **sensitive-scope verification** (privacy policy, domain, demo video)
 - [ ] Stripe Checkout UI + customer portal
@@ -47,6 +50,5 @@ Dry-run remains the default on mutating endpoints (`apply=false`).
 
 ## Privacy reminder
 
-Email bodies are sensitive. Prefer zero-retention LLM providers for SaaS,
-encrypt tokens at rest, and publish a plain-language data policy before inviting
-external users. See [PRIVACY.md](PRIVACY.md).
+Email bodies are sensitive. Prefer zero-retention LLM providers before inviting
+external users in Phase 6. See [PRIVACY.md](PRIVACY.md) and [SAAS.md](SAAS.md).

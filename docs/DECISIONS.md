@@ -124,17 +124,30 @@ On approve: create Gmail label, insert taxonomy row, apply to the triggering mes
   **0.972** (+0.010). Remaining 2 misses are holds, not mislabels. Keep hashing
   embedder for now; hosted embeddings optional if real-inbox lift stalls.
 
-## Phase 4 + 5 (ops / product) — locked while on the combined branch
+## Phase 4 + 5 (ops / product foundation) — locked while on the combined branch
 
 - Keep the service layer as the only business-logic surface; MCP + FastAPI are thin.
 - Incremental sync uses Gmail `historyId` in `sync_state`; stale history falls back to full unread.
-- `users.watch` requires `TAGSMITH_PUBSUB_TOPIC`; scheduler renews before ~7-day expiry.
+- Local scheduler **polls** history; `users.watch` lease helpers exist for when Pub/Sub is configured.
 - Dry-run remains default (`apply=false`) for CLI, MCP tools, and API mutations.
 - Tenant refresh tokens are Fernet-encrypted with `TAGSMITH_TOKEN_ENCRYPTION_KEY`.
-- Postgres via `TAGSMITH_DATABASE_URL` + `uv sync --group product`; SQLite still default locally.
-- Stripe webhook updates `tenants.plan`; Checkout UI and Google sensitive-scope verification are follow-ups (no empty stub modules).
+- SQLite remains the default DB; optional Postgres URL is experimental in Phase 5.
+- Billing **hooks** only (plan list + Stripe webhook). Checkout UI is Phase 6.
 - Next.js dashboard lives in `web/` and talks to the FastAPI review endpoints.
 
-## Explicit non-goals for this pass
+## Phase 6 — SaaS (final) — deferred
 
-No LangGraph. No empty placeholder modules. Google verification paperwork and full Stripe Checkout UI are documented follow-ups, not fake implementations.
+Do **not** implement in Phase 4/5:
+
+1. Hosted Pub/Sub push → incremental sync
+2. Stripe Checkout UI + customer portal
+3. Google OAuth sensitive-scope verification (privacy policy, domain, demo video)
+4. Postgres + pgvector multi-tenant RAG isolation
+5. Production multi-tenant deploy
+
+Tracked in [SAAS.md](SAAS.md) / [PLAN.md](PLAN.md).
+
+## Explicit non-goals for Phase 4/5
+
+No LangGraph. No empty placeholder modules for Phase 6 SaaS items. No restricted
+Gmail scopes.

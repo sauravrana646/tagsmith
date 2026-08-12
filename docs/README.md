@@ -11,6 +11,7 @@
 | [RAG.md](RAG.md) | Phase 3 few-shot retrieval over labeled examples |
 | [OPS.md](OPS.md) | Phase 4 incremental sync, watch, scheduler, MCP |
 | [PRODUCT.md](PRODUCT.md) | Phase 5 FastAPI, web OAuth, dashboard, billing hooks |
+| [SAAS.md](SAAS.md) | Phase 6 final SaaS (Pub/Sub push, Stripe Checkout, verification, pgvector) |
 | [PLAN.md](PLAN.md) | Full multi-phase product + learning plan |
 | [DECISIONS.md](DECISIONS.md) | Locked product and engineering decisions |
 

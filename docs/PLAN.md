@@ -17,7 +17,7 @@ Two objectives held at once: a sellable product, and a hands-on path through LLM
 - **Orchestration/classifier**: [Pydantic AI](https://ai.pydantic.dev) — typed outputs via Pydantic schemas, model-agnostic (OpenAI/Anthropic/Gemini/Ollama), `TestModel`/`FunctionModel` for tests without API calls. Right fit because the core problem is *reliable structured output*, not multi-agent orchestration.
 - **Gmail**: `google-api-python-client` + `google-auth-oauthlib`, scopes `gmail.modify` (read + apply labels) and `gmail.labels` (create). Deliberately **not** `https://mail.google.com/` — that is a restricted scope requiring a paid annual CASA Tier 2 assessment, while `gmail.modify` is only *sensitive* (free Google review).
 - **CLI**: Typer + Rich. **Storage**: SQLite via SQLAlchemy/SQLModel (swap to Postgres later). **Config**: pydantic-settings. **Retries**: tenacity.
-- **Later**: LanceDB or Chroma (Phase 3 RAG), `mcp` Python SDK / FastMCP (Phase 4), FastAPI + Postgres/pgvector + Next.js (Phase 5).
+- **Later**: hashing/SQLite RAG (Phase 3), `mcp` / FastMCP (Phase 4), FastAPI + Next.js local product API (Phase 5), hosted SaaS with Pub/Sub + Stripe Checkout + Google verification + Postgres/pgvector (Phase 6 final).
 - **Deferred on purpose**: LangGraph. Bring it in only when the approval loop needs durable pause/resume across restarts; for a batch job with a DB-backed queue it is unnecessary weight.
 
 ## Architecture
@@ -114,13 +114,15 @@ Seed categories: `payment-sent`, `payment-received`, `bill-due`, `subscription-r
 
 **Phase 3 — RAG.** Embed normalized emails, store vectors, and retrieve the k=5 most similar *previously labeled* emails as dynamic few-shot examples in the prompt. Also retrieve category descriptions for disambiguation. Measure against the Phase 2 baseline: this is the cleanest possible RAG lesson because you can prove the lift numerically.
 
-**Phase 4 — Continuous operation and MCP.** Incremental sync with `users.history.list` from a stored `historyId`; then Pub/Sub push via `users.watch` (expires weekly, must be renewed). Scheduler for periodic runs. An MCP server exposing `list_unread`, `classify_message`, `apply_label`, `propose_category`, `approve_proposal` so Cursor/Claude can drive the mailbox conversationally.
+**Phase 4 — Continuous operation and MCP.** Incremental sync with `users.history.list` from a stored `historyId`. Local watch lease helpers + scheduler polling (or loop). An MCP server exposing `list_unread`, `classify_message`, `apply_label`, `propose_category`, `approve_proposal` so Cursor/Claude can drive the mailbox conversationally. **Hosted Pub/Sub push is Phase 6.**
 
-**Phase 5 — Product.** FastAPI backend with web OAuth, Postgres + pgvector, per-tenant encrypted refresh tokens, a Next.js dashboard where review/approval actually lives, billing, and Google OAuth sensitive-scope verification (free, ~2–4 weeks, requires a privacy policy, domain verification, and a demo video).
+**Phase 5 — Product foundation (local / single-user API).** FastAPI wrapping the service layer, web OAuth for the operator, Fernet-encrypted refresh tokens, a Next.js review dashboard, and billing *hooks* (plan list + Stripe webhook receiver). SQLite by default; optional Postgres URL for experiments. **Stripe Checkout UI, Google verification, and multi-tenant pgvector RAG are Phase 6.**
+
+**Phase 6 — SaaS (final).** Hosted deploy with Pub/Sub push → incremental sync, Stripe Checkout + customer portal, Google OAuth sensitive-scope verification (privacy policy, domain, demo video), and Postgres + pgvector with per-tenant RAG isolation. See [SAAS.md](SAAS.md).
 
 ## Risks
 
-- **Privacy is the product risk, not a footnote.** Email bodies are among the most sensitive data a user has. For the SaaS version: zero-retention settings with the LLM provider, store hashes and embeddings rather than raw bodies, and publish a plain-language data policy. Get this right early — it is also what enterprise buyers will ask about first.
+- **Privacy is the product risk, not a footnote.** Email bodies are among the most sensitive data a user has. For the SaaS version (Phase 6): zero-retention settings with the LLM provider, store hashes and embeddings rather than raw bodies, and publish a plain-language data policy. Get this right early — it is also what enterprise buyers will ask about first.
 - **Scope discipline.** Adding `https://mail.google.com/` at any point converts a free review into a paid annual security assessment. Keep to `gmail.modify` + `gmail.labels`.
 - **Product naming.** Google rejects OAuth consent-screen names containing their product names, so the app name stays `Tagsmith`. "Gmail" may appear only descriptively in a tagline, which Google's guidance permits (it lists "PDF Viewer for Google Drive" as acceptable).
 - **Proposal spam.** Without dedupe, one unusual sender produces a dozen near-identical proposals. Fuzzy-match plus embedding-cluster pending proposals before showing them for review.
@@ -130,7 +132,7 @@ Seed categories: `payment-sent`, `payment-received`, `bill-due`, `subscription-r
 
 1. **LLM provider and cost ceiling** — resolved: Pydantic AI model string, default small hosted model.
 2. **v1 shape** — local CLI, SQLite, desktop OAuth.
-3. **Where approvals happen** — CLI in Phase 1.
+3. **Where approvals happen** — CLI in Phase 1; Phase 5 adds dashboard; Phase 6 is public SaaS.
 4. **One label per email or several?** — exactly one primary label.
 
 ## Task checklist
@@ -141,5 +143,6 @@ Seed categories: `payment-sent`, `payment-received`, `bill-due`, `subscription-r
 - [x] **Phase 1c — Apply and review**: label applier (`labels.create` + `messages.modify`, dry-run default, idempotent), proposal queue with dedupe, `tagsmith review` approve/reject flow that creates labels and reprocesses held messages.
 - [x] **Phase 2 — Evals**: hand-labeled golden set (seed in `evals/golden_set.jsonl`; grow to 100–200), eval harness (`evals/run_eval.py` / `tagsmith eval`) reporting per-label precision/recall, LLM-routing rate, cost and latency, plus Logfire/OTel tracing (`TAGSMITH_ENABLE_LOGFIRE`). Live baseline ~0.972 on DeepSeek.
 - [x] **Phase 3 — RAG**: embed labeled emails into a vector store, retrieve k nearest as dynamic few-shot examples, measure lift against the Phase 2 baseline (`docs/RAG.md`; live leave-one-out **0.982** vs Phase 2 **0.972** — merged to `main`).
-- [ ] **Phase 4 — Continuous operation and MCP**: incremental sync via the history API, Pub/Sub watch with renewal, scheduler, and an MCP server exposing the agent's tools (`docs/OPS.md`, branch `feature/phase-4-5-ops-product`).
-- [ ] **Phase 5 — Product**: FastAPI + web OAuth, Postgres/pgvector, encrypted per-tenant tokens, review dashboard, billing, Google sensitive-scope verification (`docs/PRODUCT.md`, same branch).
+- [ ] **Phase 4 — Continuous operation and MCP**: local incremental sync via history API, watch lease helpers, scheduler polling, MCP server (`docs/OPS.md`, branch `feature/phase-4-5-ops-product`).
+- [ ] **Phase 5 — Product foundation**: FastAPI + web OAuth + encrypted tokens + review dashboard + billing hooks (`docs/PRODUCT.md`, same branch).
+- [ ] **Phase 6 — SaaS (final)**: hosted Pub/Sub push, Stripe Checkout UI, Google sensitive-scope verification, Postgres/pgvector multi-tenant RAG, production deploy (`docs/SAAS.md`).

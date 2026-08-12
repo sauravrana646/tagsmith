@@ -10,9 +10,11 @@ It is both:
 2. a **learning path** through structured LLM output, evals, RAG, and (later) MCP/SaaS.
 
 Phase **0–3** are on `main` (Gmail plumbing, rules, classifier, review, evals, RAG).  
-**Phase 4+5** (continuous sync/MCP + product API/dashboard) are in progress on
+**Phase 4+5** (continuous sync/MCP + product API/dashboard foundation) are in progress on
 `feature/phase-4-5-ops-product` — see [docs/OPS.md](docs/OPS.md) and
-[docs/PRODUCT.md](docs/PRODUCT.md).
+[docs/PRODUCT.md](docs/PRODUCT.md).  
+**Phase 6 (SaaS final)** — hosted Pub/Sub, Stripe Checkout, Google verification, multi-tenant
+pgvector — is planned separately: [docs/SAAS.md](docs/SAAS.md).
 
 ---
 
@@ -42,8 +44,9 @@ Phase **0–3** are on `main` (Gmail plumbing, rules, classifier, review, evals,
 - Offline tests + CI (lint, types, tests, Gitleaks secret scan, dependency audit, Bandit) with a `quality-gate` merge check
 - Phase 2: golden-set eval harness (`tagsmith eval`) + optional Logfire tracing
 - Phase 3: RAG few-shot retrieval over labeled examples (`tagsmith eval --rag`)
-- Phase 4 (branch): incremental sync, Gmail watch, scheduler, MCP server
+- Phase 4 (branch): incremental sync, Gmail watch helpers, scheduler polling, MCP server
 - Phase 5 (branch): FastAPI + web OAuth + Next.js review dashboard + billing hooks
+- Phase 6 (planned): hosted SaaS — Pub/Sub push, Stripe Checkout, Google verification, pgvector
 
 ---
 
