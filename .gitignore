@@ -76,6 +76,12 @@ docs/_build/
 .pybuilder/
 target/
 
+# TypeScript / Next.js
+*.tsbuildinfo
+web/.next/
+web/node_modules/
+web/out/
+
 # Jupyter Notebook
 .ipynb_checkpoints
 
