@@ -195,12 +195,15 @@ async def run_eval(
         )
 
     try:
-        with span(
-            "tagsmith.eval.run",
-            n_cases=len(cases),
-            rules_only=rules_only,
-            use_rag=use_rag,
-        ), _eval_progress(enabled=show_progress, total=len(cases)) as tick:
+        with (
+            span(
+                "tagsmith.eval.run",
+                n_cases=len(cases),
+                rules_only=rules_only,
+                use_rag=use_rag,
+            ),
+            _eval_progress(enabled=show_progress, total=len(cases)) as tick,
+        ):
             for case in cases:
                 email = normalize_message(
                     case.message,
@@ -232,9 +235,7 @@ async def run_eval(
                             rationale="rules-only eval: no rule matched",
                             proposed_new=NewCategory(
                                 suggested_key="rules-only-miss",
-                                description=(
-                                    "Placeholder for offline rules-only eval misses"
-                                ),
+                                description=("Placeholder for offline rules-only eval misses"),
                                 why_no_existing_fit=(
                                     "No builtin/user rule matched this golden case"
                                 ),
@@ -262,9 +263,7 @@ async def run_eval(
                             exclude_gmail_ids={email.gmail_id},
                         )
                         examples = rag_ctx.examples or None
-                        category_hints = (
-                            format_category_hints(rag_ctx.category_hints) or None
-                        )
+                        category_hints = format_category_hints(rag_ctx.category_hints) or None
 
                     pipeline = await runner(
                         email,

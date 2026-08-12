@@ -188,7 +188,7 @@ uv run ruff format --check src tests
 uv run mypy src
 ```
 
-CI on PRs to `main`: lint, format, mypy, pytest (3.11/3.12), Gitleaks, pip-audit, Bandit.  
+CI on PRs to `main`: lint, format, mypy, pytest (3.11/3.12), web `tsc`, Gitleaks, pip-audit, Bandit; posts a PR report and auto-merges non-draft PRs when `quality-gate` is green.  
 See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md).
 
 ---
