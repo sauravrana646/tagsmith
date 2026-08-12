@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { EmptyState } from "@/components/EmptyState";
 import { api } from "@/lib/api";
 import { useApplyPreference } from "@/components/Shell";
 
@@ -77,7 +78,12 @@ export default function NeedsReviewPage() {
         Medium-confidence labels. Confirm the prediction or change to another taxonomy key.
       </p>
       {error && <div className="error">{error}</div>}
-      {items.length === 0 && <div className="panel muted">Nothing needs review.</div>}
+      {items.length === 0 && (
+        <EmptyState
+          title="Nothing needs review"
+          body="Medium-confidence labels land here after sync. Go to Overview and run Sync to classify unread mail."
+        />
+      )}
       {items.map((item) => (
         <article className="item" key={item.gmail_id}>
           <div className="item-head">

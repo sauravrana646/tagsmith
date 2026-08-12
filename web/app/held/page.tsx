@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { EmptyState } from "@/components/EmptyState";
 import { api } from "@/lib/api";
 import { useApplyPreference } from "@/components/Shell";
 
@@ -90,7 +91,12 @@ export default function HeldPage() {
         new one. Apply is {apply ? "ON" : "OFF"}.
       </p>
       {error && <div className="error">{error}</div>}
-      {items.length === 0 && <div className="panel muted">No held messages.</div>}
+      {items.length === 0 && (
+        <EmptyState
+          title="No held messages"
+          body="Held items show up after sync when nothing in the taxonomy fits confidently. Sync unread mail from Overview."
+        />
+      )}
       {items.map((item) => (
         <article className="item" key={item.gmail_id}>
           <div className="item-head">

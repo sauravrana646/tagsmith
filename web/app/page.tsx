@@ -75,6 +75,19 @@ export default function OverviewPage() {
         </div>
       </div>
 
+      {summary &&
+        summary.held === 0 &&
+        summary.needs_review === 0 &&
+        summary.proposals === 0 && (
+          <div className="empty">
+            <div className="empty-title">Queues are empty</div>
+            <p className="empty-body">
+              Nothing to review yet. Run a sync below to classify unread Gmail into Held, Needs
+              review, and Proposals.
+            </p>
+          </div>
+        )}
+
       <form className="panel" onSubmit={runSync}>
         <strong>Sync unread mail</strong>
         <p className="muted tiny">

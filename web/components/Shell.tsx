@@ -32,9 +32,15 @@ const NAV = [
 
 function initials(name?: string, email?: string): string {
   const src = (name || email || "?").trim();
-  const parts = src.split(/[\s@._-]+/).filter(Boolean);
+  const parts = src.split(/[\s]+/).filter(Boolean);
   if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
   return src.slice(0, 2).toUpperCase();
+}
+
+function displayName(me: Me): string {
+  const local = me.email?.split("@")[0];
+  if (me.name && me.name !== local && !me.name.includes("@")) return me.name;
+  return me.email || "Signed in";
 }
 
 export function Shell({ children }: { children: ReactNode }) {
@@ -44,9 +50,25 @@ export function Shell({ children }: { children: ReactNode }) {
   const [me, setMe] = useState<Me | null>(null);
   const [apply, setApply] = useState(true);
   const [busyAuth, setBusyAuth] = useState(false);
+  const [imgFailed, setImgFailed] = useState(false);
 
   const title = useMemo(() => {
     return NAV.find((n) => n.href === pathname)?.label || "Overview";
+  }, [pathname]);
+
+  const subtitle = useMemo(() => {
+    switch (pathname) {
+      case "/held":
+        return "Messages with no confident existing label";
+      case "/needs-review":
+        return "Medium-confidence predictions to confirm or change";
+      case "/proposals":
+        return "Suggested new categories awaiting approval";
+      case "/taxonomy":
+        return "Active labels used by the classifier";
+      default:
+        return "Sync mail and clear your review queues";
+    }
   }, [pathname]);
 
   const refresh = useCallback(async () => {
@@ -58,6 +80,7 @@ export function Shell({ children }: { children: ReactNode }) {
     setStatus(st);
     setSummary(sum);
     setMe(who);
+    setImgFailed(false);
   }, []);
 
   useEffect(() => {
@@ -66,7 +89,6 @@ export function Shell({ children }: { children: ReactNode }) {
 
   async function signIn() {
     setBusyAuth(true);
-    // /auth/login skips Google when a valid session cookie already exists.
     window.location.href = `${API_BASE}/auth/login`;
   }
 
@@ -84,7 +106,9 @@ export function Shell({ children }: { children: ReactNode }) {
     <div className="shell">
       <aside className="sidebar">
         <div className="brand">
-          <div className="brand-mark">TS</div>
+          <div className="brand-mark" aria-hidden>
+            TS
+          </div>
           <div>
             <div className="brand-text">Tagsmith</div>
             <div className="brand-sub">Mail review</div>
@@ -111,7 +135,9 @@ export function Shell({ children }: { children: ReactNode }) {
                 aria-current={active ? "page" : undefined}
               >
                 <span>{item.label}</span>
-                {typeof badge === "number" ? <span className="badge">{badge}</span> : null}
+                {typeof badge === "number" && badge > 0 ? (
+                  <span className="badge">{badge}</span>
+                ) : null}
               </Link>
             );
           })}
@@ -134,26 +160,42 @@ export function Shell({ children }: { children: ReactNode }) {
           </div>
 
           {me?.authenticated ? (
-            <div className="account" title={me.email}>
-              <div className="avatar" aria-hidden>
-                {me.picture_url ? (
-                  <img src={me.picture_url} alt="" referrerPolicy="no-referrer" />
-                ) : (
-                  initials(me.name, me.email)
-                )}
+            <div className="account">
+              <div className="account-row">
+                <div className="avatar" aria-hidden>
+                  {me.picture_url && !imgFailed ? (
+                    <img
+                      src={me.picture_url}
+                      alt=""
+                      referrerPolicy="no-referrer"
+                      onError={() => setImgFailed(true)}
+                    />
+                  ) : (
+                    initials(me.name, me.email)
+                  )}
+                </div>
+                <div className="account-meta">
+                  <div className="account-name">{displayName(me)}</div>
+                  {displayName(me) !== me.email ? (
+                    <div className="account-email" title={me.email}>
+                      {me.email}
+                    </div>
+                  ) : (
+                    <div className="account-email">{me.plan ? `${me.plan} plan` : "Signed in"}</div>
+                  )}
+                </div>
               </div>
-              <div className="account-meta">
-                <div className="account-name">{me.name || "Signed in"}</div>
-                <div className="account-email">{me.email}</div>
-              </div>
-              <div className="account-actions">
-                <button className="btn linkish" type="button" onClick={() => void signOut()} disabled={busyAuth}>
-                  Sign out
-                </button>
-              </div>
+              <button
+                className="btn ghost block"
+                type="button"
+                onClick={() => void signOut()}
+                disabled={busyAuth}
+              >
+                Sign out
+              </button>
             </div>
           ) : (
-            <button className="btn" type="button" onClick={() => void signIn()} disabled={busyAuth}>
+            <button className="btn block" type="button" onClick={() => void signIn()} disabled={busyAuth}>
               Sign in with Google
             </button>
           )}
@@ -164,25 +206,13 @@ export function Shell({ children }: { children: ReactNode }) {
         <header className="topbar">
           <div>
             <h1 className="page-title">{title}</h1>
-            <p className="page-sub">
-              {me?.authenticated
-                ? `Signed in as ${me.email}`
-                : "Review and apply labels without the CLI"}
-            </p>
-          </div>
-          <div className="top-actions">
-            {!me?.authenticated && (
-              <button className="btn ghost" type="button" onClick={() => void signIn()} disabled={busyAuth}>
-                Sign in
-              </button>
-            )}
+            <p className="page-sub">{subtitle}</p>
           </div>
         </header>
 
         {!status?.gmail_authenticated && (
           <div className="banner warn" role="status">
-            Run <code>uv run tagsmith auth</code> once so “Write to Gmail” can apply labels. Browsing
-            queues still works.
+            Run <code>uv run tagsmith auth</code> once so “Write to Gmail” can apply labels.
           </div>
         )}
 

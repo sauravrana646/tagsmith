@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { EmptyState } from "@/components/EmptyState";
 import { api } from "@/lib/api";
 import { useApplyPreference } from "@/components/Shell";
 
@@ -93,7 +94,12 @@ export default function ProposalsPage() {
         mail.
       </p>
       {error && <div className="error">{error}</div>}
-      {items.length === 0 && <div className="panel muted">No pending proposals.</div>}
+      {items.length === 0 && (
+        <EmptyState
+          title="No pending proposals"
+          body="Proposals appear after sync when the model suggests a new category. Run a sync from Overview first."
+        />
+      )}
       {items.map((item) => (
         <article className="item" key={item.id}>
           <div className="item-head">
