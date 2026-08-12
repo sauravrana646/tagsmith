@@ -165,6 +165,8 @@ class Tenant(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     email: str = Field(index=True, unique=True)
     google_sub: str | None = Field(default=None, index=True, unique=True)
+    display_name: str | None = None
+    picture_url: str | None = None
     # Fernet-encrypted Google refresh token (never store plaintext).
     encrypted_refresh_token: str | None = None
     plan: str = Field(default="free", index=True)

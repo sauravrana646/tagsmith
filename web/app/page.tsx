@@ -78,8 +78,8 @@ export default function OverviewPage() {
       <form className="panel" onSubmit={runSync}>
         <strong>Sync unread mail</strong>
         <p className="muted tiny">
-          Pulls from Gmail using your desktop token, classifies, and{" "}
-          {apply ? "applies labels" : "dry-runs only"}. Toggle Apply in the sidebar.
+          Classifies unread mail with your desktop Gmail token.
+          {apply ? " Labels will be written." : " Dry-run only — nothing is written."}
         </p>
         <div className="row">
           <label className="muted tiny">

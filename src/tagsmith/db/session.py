@@ -18,6 +18,8 @@ _SQLITE_COLUMN_MIGRATIONS: list[tuple[str, str, str]] = [
     ("classifications", "proposed_key", "TEXT"),
     ("classifications", "proposed_description", "TEXT"),
     ("classifications", "proposed_why", "TEXT"),
+    ("tenants", "display_name", "TEXT"),
+    ("tenants", "picture_url", "TEXT"),
 ]
 
 

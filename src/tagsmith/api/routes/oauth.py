@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import RedirectResponse
 from sqlmodel import Session, select
 
@@ -21,6 +21,51 @@ from tagsmith.db.models import Tenant, utcnow
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
+_SESSION_COOKIE = "tagsmith_tenant"
+_SESSION_MAX_AGE = 60 * 60 * 24 * 30
+
+
+def _set_session_cookie(response: Response, tenant_id: int) -> None:
+    # HttpOnly + SameSite=Lax: JS cannot read; CSRF-resistant for top-level nav.
+    # Secure is omitted for local http://127.0.0.1 development.
+    response.set_cookie(
+        key=_SESSION_COOKIE,
+        value=str(tenant_id),
+        httponly=True,
+        samesite="lax",
+        max_age=_SESSION_MAX_AGE,
+        path="/",
+    )
+
+
+def _clear_session_cookie(response: Response) -> None:
+    response.delete_cookie(_SESSION_COOKIE, path="/")
+
+
+def _tenant_from_request(request: Request, session: Session) -> Tenant | None:
+    raw = request.cookies.get(_SESSION_COOKIE) or getattr(request.state, "tenant_id", None)
+    if not raw:
+        return None
+    try:
+        tenant_id = int(raw)
+    except (TypeError, ValueError):
+        return None
+    return session.get(Tenant, tenant_id)
+
+
+def _me_payload(tenant: Tenant | None) -> dict[str, Any]:
+    if tenant is None:
+        return {"authenticated": False}
+    return {
+        "authenticated": True,
+        "tenant_id": tenant.id,
+        "email": tenant.email,
+        "name": tenant.display_name or tenant.email.split("@")[0],
+        "picture_url": tenant.picture_url,
+        "plan": tenant.plan,
+        "has_refresh_token": bool(tenant.encrypted_refresh_token),
+    }
+
 
 @router.get("/debug")
 def auth_debug(settings: Settings = Depends(settings_dep)) -> dict[str, Any]:
@@ -30,15 +75,24 @@ def auth_debug(settings: Settings = Depends(settings_dep)) -> dict[str, Any]:
 
 @router.get("/login")
 def login(
+    request: Request,
+    session: Session = Depends(session_dep),
     settings: Settings = Depends(settings_dep),
     prompt: str = Query("select_account", description="select_account | consent | none"),
+    force: bool = Query(False, description="Force Google account picker even if signed in"),
 ) -> RedirectResponse:
+    """Start Google OAuth, or bounce home if a valid session cookie already exists."""
+    existing = _tenant_from_request(request, session)
+    if existing is not None and not force:
+        dest = settings.web_app_url.rstrip("/") + "/?auth=already"
+        return RedirectResponse(dest)
+
     try:
         url, state = make_authorize_url(settings, prompt=prompt)
     except RuntimeError as exc:
         raise HTTPException(500, str(exc)) from exc
     response = RedirectResponse(url)
-    response.set_cookie("oauth_state", state, httponly=True, samesite="lax", max_age=600)
+    response.set_cookie("oauth_state", state, httponly=True, samesite="lax", max_age=600, path="/")
     return response
 
 
@@ -64,15 +118,19 @@ def callback(
 
     email = str(info.get("email") or "")
     sub = str(info.get("sub") or "") or None
+    name = str(info.get("name") or info.get("given_name") or "") or None
+    picture = str(info.get("picture") or "") or None
     if not email:
         raise HTTPException(400, "Google userinfo missing email")
 
     tenant = session.exec(select(Tenant).where(Tenant.email == email)).first()
     if tenant is None:
-        tenant = Tenant(email=email, google_sub=sub)
+        tenant = Tenant(email=email, google_sub=sub, display_name=name, picture_url=picture)
         session.add(tenant)
     else:
         tenant.google_sub = sub or tenant.google_sub
+        tenant.display_name = name or tenant.display_name
+        tenant.picture_url = picture or tenant.picture_url
         tenant.updated_at = utcnow()
 
     if refresh:
@@ -80,16 +138,10 @@ def callback(
     session.commit()
     session.refresh(tenant)
 
-    # Send the browser back to the Next.js dashboard (not the API root).
     dest = settings.web_app_url.rstrip("/") + "/?auth=ok"
     redirect = RedirectResponse(dest)
-    redirect.set_cookie(
-        "tagsmith_tenant",
-        str(tenant.id),
-        httponly=True,
-        samesite="lax",
-        max_age=60 * 60 * 24 * 30,
-    )
+    assert tenant.id is not None
+    _set_session_cookie(redirect, tenant.id)
     return redirect
 
 
@@ -98,16 +150,11 @@ def me(
     request: Request,
     session: Session = Depends(session_dep),
 ) -> dict[str, Any]:
-    tenant_id = request.cookies.get("tagsmith_tenant") or getattr(request.state, "tenant_id", None)
-    if not tenant_id:
-        return {"authenticated": False}
-    tenant = session.get(Tenant, int(tenant_id))
-    if tenant is None:
-        return {"authenticated": False}
-    return {
-        "authenticated": True,
-        "tenant_id": tenant.id,
-        "email": tenant.email,
-        "plan": tenant.plan,
-        "has_refresh_token": bool(tenant.encrypted_refresh_token),
-    }
+    return _me_payload(_tenant_from_request(request, session))
+
+
+@router.post("/logout")
+def logout() -> Response:
+    response = Response(content='{"ok":true}', media_type="application/json")
+    _clear_session_cookie(response)
+    return response
