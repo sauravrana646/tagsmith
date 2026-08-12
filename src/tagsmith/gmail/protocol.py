@@ -34,3 +34,25 @@ class GmailGateway(Protocol):
         add_label_ids: list[str] | None = None,
         remove_label_ids: list[str] | None = None,
     ) -> None: ...
+
+    def get_profile_history_id(self) -> str: ...
+
+    def list_history(
+        self,
+        *,
+        start_history_id: str,
+        max_results: int = 100,
+    ) -> tuple[list[str], str | None]:
+        """Return (changed_message_ids, latest_history_id)."""
+        ...
+
+    def watch_mailbox(
+        self,
+        *,
+        topic_name: str,
+        label_ids: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """Start users.watch; returns expiration / historyId / resource fields."""
+        ...
+
+    def stop_watch(self) -> None: ...

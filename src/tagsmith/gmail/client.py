@@ -151,3 +151,74 @@ class GmailClient:
             "removeLabelIds": remove_label_ids or [],
         }
         self._execute(self.service.users().messages().batchModify(userId="me", body=body))
+
+    def get_profile_history_id(self) -> str:
+        profile = cast(
+            dict[str, Any],
+            self._execute(self.service.users().getProfile(userId="me")),
+        )
+        history_id = profile.get("historyId")
+        if history_id is None:
+            raise RuntimeError("Gmail profile missing historyId")
+        return str(history_id)
+
+    def list_history(
+        self,
+        *,
+        start_history_id: str,
+        max_results: int = 100,
+    ) -> tuple[list[str], str | None]:
+        """Page users.history.list and collect unique message ids that changed."""
+        ids: list[str] = []
+        seen: set[str] = set()
+        page_token: str | None = None
+        latest: str | None = None
+        while True:
+            result = cast(
+                dict[str, Any],
+                self._execute(
+                    self.service.users()
+                    .history()
+                    .list(
+                        userId="me",
+                        startHistoryId=start_history_id,
+                        maxResults=min(100, max_results),
+                        pageToken=page_token,
+                        historyTypes=["messageAdded", "labelAdded", "labelRemoved"],
+                    )
+                ),
+            )
+            for entry in result.get("history") or []:
+                latest = str(entry.get("id") or latest or "")
+                for key in ("messagesAdded", "messagesDeleted", "labelsAdded", "labelsRemoved"):
+                    for item in entry.get(key) or []:
+                        msg = item.get("message") or {}
+                        mid = msg.get("id")
+                        if mid and mid not in seen:
+                            seen.add(str(mid))
+                            ids.append(str(mid))
+            if result.get("historyId") is not None:
+                latest = str(result["historyId"])
+            page_token = result.get("nextPageToken")
+            if not page_token or len(ids) >= max_results:
+                break
+        return ids[:max_results], latest
+
+    def watch_mailbox(
+        self,
+        *,
+        topic_name: str,
+        label_ids: list[str] | None = None,
+    ) -> dict[str, Any]:
+        body: dict[str, Any] = {
+            "topicName": topic_name,
+            "labelIds": label_ids or ["INBOX"],
+            "labelFilterBehavior": "include",
+        }
+        return cast(
+            dict[str, Any],
+            self._execute(self.service.users().watch(userId="me", body=body)),
+        )
+
+    def stop_watch(self) -> None:
+        self._execute(self.service.users().stop(userId="me"))

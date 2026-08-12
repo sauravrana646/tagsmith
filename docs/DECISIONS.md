@@ -124,6 +124,17 @@ On approve: create Gmail label, insert taxonomy row, apply to the triggering mes
   **0.972** (+0.010). Remaining 2 misses are holds, not mislabels. Keep hashing
   embedder for now; hosted embeddings optional if real-inbox lift stalls.
 
+## Phase 4 + 5 (ops / product) — locked while on the combined branch
+
+- Keep the service layer as the only business-logic surface; MCP + FastAPI are thin.
+- Incremental sync uses Gmail `historyId` in `sync_state`; stale history falls back to full unread.
+- `users.watch` requires `TAGSMITH_PUBSUB_TOPIC`; scheduler renews before ~7-day expiry.
+- Dry-run remains default (`apply=false`) for CLI, MCP tools, and API mutations.
+- Tenant refresh tokens are Fernet-encrypted with `TAGSMITH_TOKEN_ENCRYPTION_KEY`.
+- Postgres via `TAGSMITH_DATABASE_URL` + `uv sync --group product`; SQLite still default locally.
+- Stripe webhook updates `tenants.plan`; Checkout UI and Google sensitive-scope verification are follow-ups (no empty stub modules).
+- Next.js dashboard lives in `web/` and talks to the FastAPI review endpoints.
+
 ## Explicit non-goals for this pass
 
-No LangGraph, no web UI, no vector DB, no MCP, and no empty placeholder modules for them.
+No LangGraph. No empty placeholder modules. Google verification paperwork and full Stripe Checkout UI are documented follow-ups, not fake implementations.

@@ -26,6 +26,11 @@ class FakeGmail:
         }
         self._label_seq = 1000
         self.modify_calls: list[dict[str, Any]] = []
+        self.history_id = "1000"
+        # Map start_history_id -> list of message ids that changed after it.
+        self.history_events: dict[str, list[str]] = {}
+        self.watch_calls: list[dict[str, Any]] = []
+        self.stop_watch_calls = 0
 
     def list_labels(self) -> list[dict[str, Any]]:
         return list(self.labels.values())
@@ -96,3 +101,35 @@ class FakeGmail:
                 add_label_ids=add_label_ids,
                 remove_label_ids=remove_label_ids,
             )
+
+    def get_profile_history_id(self) -> str:
+        return self.history_id
+
+    def list_history(
+        self,
+        *,
+        start_history_id: str,
+        max_results: int = 100,
+    ) -> tuple[list[str], str | None]:
+        ids = list(self.history_events.get(start_history_id) or [])[:max_results]
+        # Advance cursor when events exist.
+        if ids:
+            self.history_id = str(int(self.history_id) + 1)
+        return ids, self.history_id
+
+    def watch_mailbox(
+        self,
+        *,
+        topic_name: str,
+        label_ids: list[str] | None = None,
+    ) -> dict[str, Any]:
+        call = {"topicName": topic_name, "labelIds": label_ids or ["INBOX"]}
+        self.watch_calls.append(call)
+        return {
+            "historyId": self.history_id,
+            "expiration": "9999999999999",
+            "resourceId": "fake-resource",
+        }
+
+    def stop_watch(self) -> None:
+        self.stop_watch_calls += 1

@@ -21,6 +21,7 @@ from tagsmith.db.models import (
     NegativeExample,
     ReviewStatus,
     Run,
+    SyncState,
     utcnow,
 )
 from tagsmith.gmail.parser import NormalizedEmail, normalize_message
@@ -409,6 +410,53 @@ class SyncService:
             }
         )
 
+    def get_sync_state(self) -> SyncState:
+        state = self.session.get(SyncState, 1)
+        if state is None:
+            state = SyncState(id=1)
+            self.session.add(state)
+            self.session.commit()
+            self.session.refresh(state)
+        return state
+
+    def ensure_history_cursor(self) -> SyncState:
+        """Bootstrap historyId from Gmail profile when missing."""
+        state = self.get_sync_state()
+        if state.history_id:
+            return state
+        state.history_id = self.gmail.get_profile_history_id()
+        state.updated_at = utcnow()
+        self.session.commit()
+        self.session.refresh(state)
+        log.info("sync.history_cursor_bootstrapped", history_id=state.history_id)
+        return state
+
+    def _finalize_run(
+        self,
+        run: Run,
+        *,
+        counts: SyncCounts,
+        decisions: list[dict[str, Any]],
+        notes: str = "",
+    ) -> SyncResult:
+        run.finished_at = datetime.now(UTC)
+        run.counts_json = counts.as_dict()
+        run.notes = notes
+        token_total = 0
+        for decision in decisions:
+            t = decision.get("tokens")
+            if isinstance(t, int):
+                token_total += t
+        if token_total and (
+            self.settings.cost_per_1k_input_tokens or self.settings.cost_per_1k_output_tokens
+        ):
+            blended = (
+                self.settings.cost_per_1k_input_tokens + self.settings.cost_per_1k_output_tokens
+            ) / 2.0
+            run.cost_estimate = (token_total / 1000.0) * blended
+        self.session.commit()
+        return SyncResult(run_id=run.id, dry_run=run.dry_run, counts=counts, decisions=decisions)
+
     async def sync(
         self,
         *,
@@ -421,7 +469,7 @@ class SyncService:
         if apply:
             self.taxonomy.reconcile_gmail_labels(self.gmail)  # type: ignore[arg-type]
 
-        run = Run(started_at=datetime.now(UTC), dry_run=not apply)
+        run = Run(started_at=datetime.now(UTC), dry_run=not apply, notes="full_unread")
         self.session.add(run)
         self.session.commit()
         self.session.refresh(run)
@@ -449,25 +497,82 @@ class SyncService:
                     decisions=decisions,
                 )
 
-        run.finished_at = datetime.now(UTC)
-        run.counts_json = counts.as_dict()
-        # Rough run cost from LLM token totals recorded on decisions (when present).
-        token_total = 0
-        for decision in decisions:
-            t = decision.get("tokens")
-            if isinstance(t, int):
-                token_total += t
-        if token_total and (
-            self.settings.cost_per_1k_input_tokens or self.settings.cost_per_1k_output_tokens
-        ):
-            # Without per-side split on the run, use blended average of configured rates.
-            blended = (
-                self.settings.cost_per_1k_input_tokens + self.settings.cost_per_1k_output_tokens
-            ) / 2.0
-            run.cost_estimate = (token_total / 1000.0) * blended
+        # After a full sync, anchor the incremental cursor at the current profile history.
+        state = self.get_sync_state()
+        state.history_id = self.gmail.get_profile_history_id()
+        state.updated_at = utcnow()
         self.session.commit()
 
-        return SyncResult(run_id=run.id, dry_run=not apply, counts=counts, decisions=decisions)
+        return self._finalize_run(run, counts=counts, decisions=decisions, notes="full_unread")
+
+    async def sync_incremental(
+        self,
+        *,
+        limit: int = 100,
+        apply: bool = False,
+        reprocess: bool = False,
+        fallback_to_full: bool = True,
+    ) -> SyncResult:
+        """Process messages changed since the stored historyId (Phase 4)."""
+        self.bootstrap()
+        if apply:
+            self.taxonomy.reconcile_gmail_labels(self.gmail)  # type: ignore[arg-type]
+
+        state = self.ensure_history_cursor()
+        start_history_id = state.history_id
+        assert start_history_id is not None
+
+        run = Run(started_at=datetime.now(UTC), dry_run=not apply, notes="incremental")
+        self.session.add(run)
+        self.session.commit()
+        self.session.refresh(run)
+
+        counts = SyncCounts()
+        decisions: list[dict[str, Any]] = []
+
+        with span(
+            "tagsmith.sync.incremental",
+            limit=limit,
+            apply=apply,
+            start_history_id=start_history_id,
+        ):
+            try:
+                ids, latest = self.gmail.list_history(
+                    start_history_id=start_history_id,
+                    max_results=limit,
+                )
+            except Exception as exc:
+                # Gmail returns 404 when historyId is too old — fall back to full unread.
+                log.warning("sync.history_stale", error=str(exc), history_id=start_history_id)
+                if fallback_to_full:
+                    self.session.delete(run)
+                    self.session.commit()
+                    return await self.sync(limit=limit, apply=apply, reprocess=reprocess)
+                raise
+
+            counts.fetched = len(ids)
+            for gmail_id in ids:
+                try:
+                    raw = self.gmail.get_message(gmail_id)
+                except Exception as exc:
+                    log.warning("sync.history_message_missing", gmail_id=gmail_id, error=str(exc))
+                    continue
+                email = normalize_message(raw, body_char_limit=self.settings.body_char_limit)
+                await self.process_email(
+                    email,
+                    apply=apply,
+                    reprocess=reprocess,
+                    counts=counts,
+                    decisions=decisions,
+                )
+
+            state = self.get_sync_state()
+            state.history_id = latest or self.gmail.get_profile_history_id()
+            state.last_incremental_at = utcnow()
+            state.updated_at = utcnow()
+            self.session.commit()
+
+        return self._finalize_run(run, counts=counts, decisions=decisions, notes="incremental")
 
     async def reclassify_held(self, *, apply: bool) -> SyncResult:
         """Re-run classification for held messages (used after proposal approval)."""

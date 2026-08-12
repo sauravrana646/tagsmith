@@ -140,3 +140,33 @@ class Run(SQLModel, table=True):
     cost_estimate: float | None = None
     dry_run: bool = True
     notes: str = Field(default="", sa_column=Column(Text, default=""))
+
+
+class SyncState(SQLModel, table=True):
+    """Mailbox sync cursor + Gmail watch lease (Phase 4). Single-row for local CLI."""
+
+    __tablename__ = "sync_state"
+
+    id: int = Field(default=1, primary_key=True)
+    history_id: str | None = Field(default=None, index=True)
+    watch_expiration_ms: int | None = Field(default=None)
+    watch_resource_id: str | None = None
+    pubsub_topic: str | None = None
+    last_incremental_at: datetime | None = None
+    last_watch_renewed_at: datetime | None = None
+    updated_at: datetime = Field(default_factory=utcnow)
+
+
+class Tenant(SQLModel, table=True):
+    """Multi-tenant account for Phase 5 API (local single-user still uses desktop token)."""
+
+    __tablename__ = "tenants"
+
+    id: int | None = Field(default=None, primary_key=True)
+    email: str = Field(index=True, unique=True)
+    google_sub: str | None = Field(default=None, index=True, unique=True)
+    # Fernet-encrypted Google refresh token (never store plaintext).
+    encrypted_refresh_token: str | None = None
+    plan: str = Field(default="free", index=True)
+    created_at: datetime = Field(default_factory=utcnow)
+    updated_at: datetime = Field(default_factory=utcnow)
