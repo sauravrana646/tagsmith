@@ -38,6 +38,12 @@ async def test_sync_dry_run_rules_path(session, settings: Settings, fake_gmail) 
     assert record.source == ClassificationSource.RULE
     assert record.confidence is None
     assert record.label_key == "payment-sent"
+    from tagsmith.rag.index import catchup_from_db, make_store
+
+    assert make_store(session, settings).count() == 0
+    caught = catchup_from_db(session, settings)
+    assert caught.indexed == 1
+    assert make_store(session, settings).count() == 1
 
 
 @pytest.mark.asyncio
@@ -58,6 +64,9 @@ async def test_user_removed_label_becomes_negative(session, settings: Settings, 
     await service.sync(limit=10, apply=True)
     msg = session.get(Message, "msg_payment_1")
     assert msg and msg.applied_label_id
+    from tagsmith.rag.index import make_store
+
+    assert make_store(session, settings).count() == 1
     # Simulate user removing the label in Gmail.
     raw = fake_gmail.messages["msg_payment_1"]
     raw["labelIds"] = ["INBOX", "UNREAD"]
@@ -66,6 +75,7 @@ async def test_user_removed_label_becomes_negative(session, settings: Settings, 
     neg = session.exec(select(NegativeExample)).first()
     assert neg is not None
     assert neg.label_key == "payment-sent"
+    assert make_store(session, settings).count() == 0
 
 
 @pytest.mark.asyncio
@@ -105,6 +115,9 @@ async def test_llm_medium_band_and_confirm(session, settings: Settings, fake_gma
         msg = session.get(Message, "msg_html_1")
         assert msg is not None
         assert msg.state == MessageState.NEEDS_REVIEW
+        from tagsmith.rag.index import make_store
+
+        assert make_store(session, settings).count() == 0
 
         ops = ReviewOps(session, fake_gmail, settings)
         record = ops.confirm_label("msg_html_1", apply=True)
@@ -114,6 +127,9 @@ async def test_llm_medium_band_and_confirm(session, settings: Settings, fake_gma
         refreshed = session.get(Message, "msg_html_1")
         assert refreshed is not None
         assert refreshed.state == MessageState.LABELED
+        from tagsmith.rag.index import make_store
+
+        assert make_store(session, settings).count() == 1
     finally:
         pipeline_mod.classify_email = monkey_original  # type: ignore[assignment]
 

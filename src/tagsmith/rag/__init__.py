@@ -1,8 +1,23 @@
 """Phase 3 RAG: embeddings, example store, retrieval."""
 
 from tagsmith.rag.embedder import HashingEmbedder, build_embedder, cosine_similarity
+from tagsmith.rag.index import RagCatchupResult, catchup_from_db
 from tagsmith.rag.retriever import RagContext, Retriever, format_category_hints
 from tagsmith.rag.store import ExampleStore, RagExample, example_text_from_email
+
+__all__ = [
+    "ExampleStore",
+    "HashingEmbedder",
+    "RagCatchupResult",
+    "RagContext",
+    "RagExample",
+    "Retriever",
+    "build_embedder",
+    "catchup_from_db",
+    "cosine_similarity",
+    "example_text_from_email",
+    "format_category_hints",
+]
 
 __all__ = [
     "ExampleStore",

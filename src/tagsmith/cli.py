@@ -259,15 +259,42 @@ def eval_export_corrections(
 @rag_app.command("status")
 def rag_status() -> None:
     """Show how many labeled examples are indexed for RAG."""
-    from tagsmith.rag.index import make_store
+    from tagsmith.rag.index import rag_status_payload
 
     settings = _settings()
     init_db(settings)
     with get_session(settings) as session:
-        n = make_store(session, settings).count()
+        payload = rag_status_payload(session, settings)
     console.print(
-        f"RAG examples indexed: [bold]{n}[/bold] "
-        f"(enable_rag={settings.enable_rag}, k={settings.rag_example_k})"
+        f"RAG examples indexed: [bold]{payload['rag_example_count']}[/bold] "
+        f"(enable_rag={payload['enable_rag']}, k={payload['rag_example_k']})"
+    )
+    if payload["last_rag_catchup_at"]:
+        console.print(
+            f"Last catch-up: {payload['last_rag_catchup_at']} "
+            f"(indexed={payload['last_rag_indexed']}, removed={payload['last_rag_removed']})"
+        )
+    else:
+        console.print("Last catch-up: never (run schedule, API background loop, or `rag catchup`)")
+    console.print(
+        f"Background sync: {payload['background_sync']} "
+        f"(apply={payload['background_sync_apply']}, "
+        f"interval={payload['schedule_interval_seconds']}s)"
+    )
+
+
+@rag_app.command("catchup")
+def rag_catchup() -> None:
+    """Index missing labeled messages and drop stale RAG examples."""
+    from tagsmith.rag.index import catchup_from_db
+
+    settings = _settings()
+    init_db(settings)
+    with get_session(settings) as session:
+        result = catchup_from_db(session, settings)
+    console.print(
+        f"[green]catch-up[/green] indexed={result.indexed} "
+        f"removed={result.removed} total={result.total}"
     )
 
 
@@ -648,7 +675,7 @@ def schedule_run(
     interval: int | None = typer.Option(None, "--interval", help="Seconds between ticks."),
     full: bool = typer.Option(False, "--full", help="Use full unread sync instead of incremental."),
 ) -> None:
-    """Periodic incremental sync + watch renewal."""
+    """Periodic incremental sync, watch renewal, and RAG catch-up."""
     from contextlib import contextmanager
 
     from tagsmith.scheduler import run_scheduler_loop

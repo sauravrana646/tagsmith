@@ -9,6 +9,9 @@ type Status = {
   gmail_authenticated: boolean;
   gmail_detail: string;
   hint: string;
+  enable_rag?: boolean;
+  rag_example_count?: number;
+  background_sync?: boolean;
 };
 
 type Summary = { proposals: number; needs_review: number; held: number };
@@ -158,6 +161,12 @@ export function Shell({ children }: { children: ReactNode }) {
             <span className="dot" />
             {status?.gmail_authenticated ? "Gmail connected" : "Gmail token needed"}
           </div>
+          {status?.enable_rag ? (
+            <div className="pill">
+              RAG {status.rag_example_count ?? 0} examples
+              {status.background_sync ? " · auto" : ""}
+            </div>
+          ) : null}
 
           {me?.authenticated ? (
             <div className="account">

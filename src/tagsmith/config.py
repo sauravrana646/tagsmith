@@ -68,6 +68,10 @@ class Settings(BaseSettings):
     pubsub_topic: str | None = None
     schedule_interval_seconds: int = 300
     watch_renew_hours: int = 24 * 6  # renew before the ~7-day Gmail watch expiry
+    # In-process loop when `tagsmith api` starts (sync + RAG catch-up).
+    enable_background_sync: bool = True
+    # Background ticks write Gmail labels only when true (default dry-run, like CLI schedule).
+    background_sync_apply: bool = False
 
     # Phase 5 — API / multi-tenant
     api_host: str = "127.0.0.1"

@@ -20,6 +20,9 @@ _SQLITE_COLUMN_MIGRATIONS: list[tuple[str, str, str]] = [
     ("classifications", "proposed_why", "TEXT"),
     ("tenants", "display_name", "TEXT"),
     ("tenants", "picture_url", "TEXT"),
+    ("sync_state", "last_rag_catchup_at", "TIMESTAMP"),
+    ("sync_state", "last_rag_indexed", "INTEGER"),
+    ("sync_state", "last_rag_removed", "INTEGER"),
 ]
 
 

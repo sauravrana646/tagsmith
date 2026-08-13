@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -11,9 +13,20 @@ from fastapi.staticfiles import StaticFiles
 
 from tagsmith import __version__
 from tagsmith.api.routes import billing, health, oauth, review, status, sync, taxonomy
+from tagsmith.background import start_background_loop, stop_background_loop
 from tagsmith.config import get_settings
 from tagsmith.db.session import init_db
 from tagsmith.telemetry import configure_logging
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    settings = get_settings()
+    task = start_background_loop(settings)
+    try:
+        yield
+    finally:
+        await stop_background_loop(task)
 
 
 def create_app() -> FastAPI:
@@ -25,6 +38,7 @@ def create_app() -> FastAPI:
         title="Tagsmith API",
         version=__version__,
         description="Phase 5 product API wrapping the Tagsmith service layer.",
+        lifespan=lifespan,
     )
     app.add_middleware(
         CORSMiddleware,

@@ -77,4 +77,34 @@ async def test_schedule_tick_incremental(
     tick = await run_schedule_tick(session, gmail, settings, apply=False, renew_watch=True)
     assert tick.sync is not None
     assert tick.watch is not None
+    assert tick.rag is not None
     assert tick.errors == []
+
+
+@pytest.mark.asyncio
+async def test_schedule_tick_catchup_without_gmail(
+    session: Session,
+    settings: Settings,
+) -> None:
+    from tagsmith.db.models import Message, MessageState
+    from tagsmith.rag.index import make_store
+
+    session.add(
+        Message(
+            gmail_id="solo",
+            thread_id="t-solo",
+            sender="a@b.com",
+            subject="OTP 123",
+            state=MessageState.LABELED,
+            applied_label_key="otp-verification",
+            payload_json={"sender": "a@b.com", "subject": "OTP 123", "body_text": "code"},
+        )
+    )
+    session.commit()
+    tick = await run_schedule_tick(session, None, settings, apply=False, renew_watch=False)
+    assert tick.sync is None
+    assert tick.watch is None
+    assert tick.rag is not None
+    assert tick.rag.indexed == 1
+    assert tick.errors == []
+    assert make_store(session, settings).count() == 1

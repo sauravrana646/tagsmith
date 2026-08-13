@@ -1,4 +1,4 @@
-"""Periodic sync + watch renewal (Phase 4)."""
+"""Periodic sync + watch renewal + RAG catch-up (Phase 4)."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ from sqlmodel import Session
 from tagsmith.config import Settings
 from tagsmith.db.models import utcnow
 from tagsmith.gmail.protocol import GmailGateway
+from tagsmith.rag.index import RagCatchupResult, catchup_from_db
 from tagsmith.services.sync import SyncResult, SyncService
 from tagsmith.services.watch_ops import WatchOps, WatchStatus
 from tagsmith.telemetry import get_logger
@@ -22,6 +23,7 @@ log = get_logger(__name__)
 class ScheduleTickResult:
     sync: SyncResult | None
     watch: WatchStatus | None
+    rag: RagCatchupResult | None
     errors: list[str]
 
     def as_dict(self) -> dict[str, Any]:
@@ -34,13 +36,14 @@ class ScheduleTickResult:
                 "counts": self.sync.counts.as_dict(),
             },
             "watch": None if self.watch is None else self.watch.as_dict(),
+            "rag": None if self.rag is None else self.rag.as_dict(),
             "errors": list(self.errors),
         }
 
 
 async def run_schedule_tick(
     session: Session,
-    gmail: GmailGateway,
+    gmail: GmailGateway | None,
     settings: Settings,
     *,
     apply: bool = False,
@@ -48,39 +51,48 @@ async def run_schedule_tick(
     incremental: bool = True,
     limit: int = 100,
 ) -> ScheduleTickResult:
-    """One scheduler cycle: incremental sync + optional watch renew."""
+    """One scheduler cycle: optional incremental sync, watch renew, RAG catch-up."""
     errors: list[str] = []
     sync_result: SyncResult | None = None
     watch_status: WatchStatus | None = None
+    rag_result: RagCatchupResult | None = None
 
-    sync = SyncService(session, gmail, settings)
+    if gmail is not None:
+        sync = SyncService(session, gmail, settings)
+        try:
+            if incremental:
+                sync_result = await sync.sync_incremental(limit=limit, apply=apply)
+            else:
+                sync_result = await sync.sync(limit=limit, apply=apply)
+        except Exception as exc:
+            log.exception("schedule.sync_failed", error=str(exc))
+            errors.append(f"sync: {exc}")
+
+        if renew_watch and settings.pubsub_topic:
+            watch = WatchOps(session, gmail, settings)
+            status = watch.status()
+            should_renew = True
+            if status.watch_expiration_ms is not None:
+                remaining_ms = status.watch_expiration_ms - int(utcnow().timestamp() * 1000)
+                should_renew = remaining_ms < settings.watch_renew_hours * 3600 * 1000
+            if should_renew:
+                try:
+                    watch_status = watch.start_or_renew()
+                except Exception as exc:
+                    log.exception("schedule.watch_failed", error=str(exc))
+                    errors.append(f"watch: {exc}")
+            else:
+                watch_status = status
+    else:
+        log.info("schedule.skip_sync", reason="gmail_unavailable")
+
     try:
-        if incremental:
-            sync_result = await sync.sync_incremental(limit=limit, apply=apply)
-        else:
-            sync_result = await sync.sync(limit=limit, apply=apply)
+        rag_result = catchup_from_db(session, settings)
     except Exception as exc:
-        log.exception("schedule.sync_failed", error=str(exc))
-        errors.append(f"sync: {exc}")
+        log.exception("schedule.rag_catchup_failed", error=str(exc))
+        errors.append(f"rag: {exc}")
 
-    if renew_watch and settings.pubsub_topic:
-        watch = WatchOps(session, gmail, settings)
-        status = watch.status()
-        should_renew = True
-        if status.watch_expiration_ms is not None:
-            # Renew when under renew_hours remain.
-            remaining_ms = status.watch_expiration_ms - int(utcnow().timestamp() * 1000)
-            should_renew = remaining_ms < settings.watch_renew_hours * 3600 * 1000
-        if should_renew:
-            try:
-                watch_status = watch.start_or_renew()
-            except Exception as exc:
-                log.exception("schedule.watch_failed", error=str(exc))
-                errors.append(f"watch: {exc}")
-        else:
-            watch_status = status
-
-    return ScheduleTickResult(sync=sync_result, watch=watch_status, errors=errors)
+    return ScheduleTickResult(sync=sync_result, watch=watch_status, rag=rag_result, errors=errors)
 
 
 async def run_scheduler_loop(

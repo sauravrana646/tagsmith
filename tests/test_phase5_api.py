@@ -47,3 +47,9 @@ def test_api_health_and_plans(settings: Settings, monkeypatch) -> None:  # type:
     summary = client.get("/api/review/summary")
     assert summary.status_code == 200
     assert set(summary.json()) >= {"held", "needs_review", "proposals"}
+
+    status_body = status.json()
+    assert status_body["enable_rag"] is True
+    assert isinstance(status_body["rag_example_count"], int)
+    assert "background_sync" in status_body
+    assert "last_rag_catchup_at" in status_body

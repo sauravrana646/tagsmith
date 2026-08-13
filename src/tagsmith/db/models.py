@@ -154,6 +154,9 @@ class SyncState(SQLModel, table=True):
     pubsub_topic: str | None = None
     last_incremental_at: datetime | None = None
     last_watch_renewed_at: datetime | None = None
+    last_rag_catchup_at: datetime | None = None
+    last_rag_indexed: int | None = None
+    last_rag_removed: int | None = None
     updated_at: datetime = Field(default_factory=utcnow)
 
 

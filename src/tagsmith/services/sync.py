@@ -26,7 +26,7 @@ from tagsmith.db.models import (
 )
 from tagsmith.gmail.parser import NormalizedEmail, normalize_message
 from tagsmith.gmail.protocol import GmailGateway
-from tagsmith.rag.index import index_normalized, make_store
+from tagsmith.rag.index import index_normalized, make_store, unindex_gmail_id
 from tagsmith.rag.retriever import Retriever, format_category_hints
 from tagsmith.rag.store import example_text_from_email
 from tagsmith.review.queue import ReviewService
@@ -121,6 +121,7 @@ class SyncService:
         message.state = MessageState.USER_REMOVED
         message.updated_at = utcnow()
         self.session.commit()
+        unindex_gmail_id(self.session, self.settings, message.gmail_id)
         log.info(
             "sync.user_removed_label",
             gmail_id=message.gmail_id,
@@ -385,8 +386,8 @@ class SyncService:
         self.session.add(record)
         self.session.commit()
 
-        # Index confidently applied labels into the RAG store for future few-shots.
-        if self.settings.enable_rag and label_key and not hold and not needs_review:
+        # Index only committed applies (not dry-run / hold / needs-review).
+        if self.settings.enable_rag and apply and label_key and not hold and not needs_review:
             index_normalized(make_store(self.session, self.settings), email, label_key=label_key)
 
         decisions.append(

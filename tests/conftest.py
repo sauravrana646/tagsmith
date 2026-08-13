@@ -10,8 +10,10 @@ from sqlmodel import Session, SQLModel, create_engine
 from tests.fixtures.messages import ALL_FIXTURES
 
 from tagsmith.config import Settings
+from tagsmith.db import models as _models  # noqa: F401
 from tagsmith.db.session import reset_engine
 from tagsmith.gmail.fake import FakeGmail
+from tagsmith.rag.store import RagExample  # noqa: F401
 from tagsmith.taxonomy.registry import TaxonomyRegistry
 
 
@@ -27,6 +29,7 @@ def settings(tmp_path: Path) -> Settings:
         llm_model="test",
         body_char_limit=2000,
         log_level="WARNING",
+        enable_background_sync=False,
     )
 
 

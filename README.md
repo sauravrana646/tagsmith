@@ -44,7 +44,7 @@ pgvector — is planned separately: [docs/SAAS.md](docs/SAAS.md).
 - Offline tests + CI (lint, types, tests, Gitleaks secret scan, dependency audit, Bandit) with a `quality-gate` merge check
 - Phase 2: golden-set eval harness (`tagsmith eval`) + optional Logfire tracing
 - Phase 3: RAG few-shot retrieval over labeled examples (`tagsmith eval --rag`)
-- Phase 4 (branch): incremental sync, Gmail watch helpers, scheduler polling, MCP server
+- Phase 4 (branch): incremental sync, Gmail watch helpers, scheduler polling, MCP server, RAG catch-up in the background
 - Phase 5 (branch): FastAPI + web OAuth + Next.js review dashboard + billing hooks
 - Phase 6 (planned): hosted SaaS — Pub/Sub push, Stripe Checkout, Google verification, pgvector
 

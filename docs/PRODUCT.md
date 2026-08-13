@@ -19,7 +19,7 @@ Hosted multi-tenant work lives in **Phase 6** — see [SAAS.md](SAAS.md).
 | Review UI | SaaS-style console: Overview, Held, Needs review, Proposals, Taxonomy |
 | Review API | summary/list + assign/propose/confirm/change/approve/reject |
 | Sync UI/API | Run incremental/full sync from Overview (`Apply to Gmail` toggle) |
-| Status | `/api/status` — desktop Gmail token readiness |
+| Status | `/api/status` — desktop Gmail token, RAG example count, background sync |
 | Taxonomy | `/api/taxonomy/labels` |
 | Web OAuth | `/auth/login`, `/auth/callback`, `/auth/me` (optional for local UI) |
 | Token crypto | Fernet via `TAGSMITH_TOKEN_ENCRYPTION_KEY` |

@@ -5,16 +5,21 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, Depends
+from sqlmodel import Session
 
-from tagsmith.api.deps import settings_dep
+from tagsmith.api.deps import session_dep, settings_dep
 from tagsmith.config import Settings
 from tagsmith.gmail.auth import AuthError, get_credentials
+from tagsmith.rag.index import rag_status_payload
 
 router = APIRouter(prefix="/api/status", tags=["status"])
 
 
 @router.get("")
-def status(settings: Settings = Depends(settings_dep)) -> dict[str, Any]:
+def status(
+    settings: Settings = Depends(settings_dep),
+    session: Session = Depends(session_dep),
+) -> dict[str, Any]:
     gmail_ok = False
     gmail_detail = "Not authenticated"
     try:
@@ -23,7 +28,7 @@ def status(settings: Settings = Depends(settings_dep)) -> dict[str, Any]:
         gmail_detail = "Desktop token ready (CLI `tagsmith auth`)" if gmail_ok else "Token invalid"
     except AuthError as exc:
         gmail_detail = str(exc)
-    return {
+    payload: dict[str, Any] = {
         "gmail_authenticated": gmail_ok,
         "gmail_detail": gmail_detail,
         "web_app_url": settings.web_app_url,
@@ -35,3 +40,5 @@ def status(settings: Settings = Depends(settings_dep)) -> dict[str, Any]:
             "Run `uv run tagsmith auth` once if gmail_authenticated is false."
         ),
     }
+    payload.update(rag_status_payload(session, settings))
+    return payload
