@@ -323,13 +323,18 @@ SOC 2, ISO, DPO, HIPAA, PCI-DSS (PayPal/Paddle hold cards; we never store PAN).
 
 ## 9. Documents to publish before first paid foreign user
 
-| Doc | Must include |
-|-----|----------------|
-| Privacy policy | Collect / use / processors / Limited Use / retention / deletion / no ads |
-| Terms | Label-only, 7-day conditional refund, cancel, liability, India law |
-| Sub-processors | Google, LLM, host, PayPal (or Paddle) |
-| DPA | If EU or serious B2B |
-| Pay / invoice | Price, what Pro includes, refund rule |
+Drafts live in [`policies/`](../policies/README.md) (not legal advice). Fill
+`[BRACKET]` placeholders, then host on `[SITE_URL]`.
+
+| Doc | File |
+|-----|------|
+| Privacy policy | [`policies/privacy-policy.md`](../policies/privacy-policy.md) |
+| Terms | [`policies/terms-of-service.md`](../policies/terms-of-service.md) |
+| Google Limited Use | [`policies/google-limited-use.md`](../policies/google-limited-use.md) |
+| Sub-processors | [`policies/sub-processors.md`](../policies/sub-processors.md) |
+| Cookies | [`policies/cookie-notice.md`](../policies/cookie-notice.md) |
+| Refunds | [`policies/refund-policy.md`](../policies/refund-policy.md) |
+| DPA (EU/B2B) | [`policies/dpa.md`](../policies/dpa.md) |
 
 In-product: **Connect Gmail**, **Disconnect & delete my data**.
 
