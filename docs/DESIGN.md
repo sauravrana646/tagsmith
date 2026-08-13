@@ -1,6 +1,6 @@
 # Design document
 
-Status: **Phase 0–3 on main; Phase 4+5 product foundation in progress; Phase 6 SaaS deferred**  
+Status: **Phase 0–3 on main; Phase 4+5 local product in progress; public SaaS not an active goal**  
 Related: [PLAN.md](PLAN.md), [DECISIONS.md](DECISIONS.md), [PRIVACY.md](PRIVACY.md), [OPS.md](OPS.md), [PRODUCT.md](PRODUCT.md), [PHASE6.md](PHASE6.md)
 
 ## 1. Goals

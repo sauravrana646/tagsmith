@@ -12,7 +12,7 @@
 | [OPS.md](OPS.md) | Phase 4 incremental sync, watch, scheduler, MCP |
 | [PRODUCT.md](PRODUCT.md) | Phase 5 FastAPI, web OAuth, dashboard, billing hooks |
 | [SAAS.md](SAAS.md) | Phase 6 pointer |
-| [PHASE6.md](PHASE6.md) | Phase 6 plan: hosted SaaS, payments, refunds, India/solo legal |
+| [PHASE6.md](PHASE6.md) | Decision: not a consumer/SaaS product; local technical tool |
 | [PLAN.md](PLAN.md) | Full multi-phase product + learning plan |
 | [DECISIONS.md](DECISIONS.md) | Locked product and engineering decisions |
 

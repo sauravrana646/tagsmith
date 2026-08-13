@@ -8,8 +8,8 @@ Stop full unread scans as the only path. Keep a Gmail `historyId`, sync
 incrementally, renew `users.watch` leases, schedule periodic ticks, and expose
 the same service layer over MCP.
 
-**Local / dogfood first.** Hosted Pub/Sub push to a public HTTPS endpoint is
-**Phase 6 (SaaS)** — see [PHASE6.md](PHASE6.md).
+**Local / dogfood first.** Hosted Pub/Sub is **not** an active product goal —
+see [PHASE6.md](PHASE6.md).
 
 ## Pieces
 

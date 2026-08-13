@@ -13,8 +13,8 @@ Phase **0–3** are on `main` (Gmail plumbing, rules, classifier, review, evals,
 **Phase 4+5** (continuous sync/MCP + product API/dashboard foundation) are in progress on
 `feature/phase-4-5-ops-product` — see [docs/OPS.md](docs/OPS.md) and
 [docs/PRODUCT.md](docs/PRODUCT.md).  
-**Phase 6 (SaaS final)** — hosted deploy, Google verification, PayPal (not Stripe v1),
-Pro $12 — is planned in [docs/PHASE6.md](docs/PHASE6.md).
+**Phase 6** — not pursuing consumer SaaS or a non-tech installer; local tool only.
+See [docs/PHASE6.md](docs/PHASE6.md).
 
 ---
 
@@ -46,7 +46,7 @@ Pro $12 — is planned in [docs/PHASE6.md](docs/PHASE6.md).
 - Phase 3: RAG few-shot retrieval over labeled examples (`tagsmith eval --rag`)
 - Phase 4 (branch): incremental sync, Gmail watch helpers, scheduler polling, MCP server, RAG catch-up in the background
 - Phase 5 (branch): FastAPI + web OAuth + Next.js review dashboard + billing hooks
-- Phase 6 (planned): hosted SaaS — Pub/Sub push, Stripe Checkout, Google verification, pgvector
+- Phase 6: **dropped** as a consumer/SaaS goal — [docs/PHASE6.md](docs/PHASE6.md)
 
 ---
 

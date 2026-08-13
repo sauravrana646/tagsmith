@@ -26,7 +26,7 @@ When a message misses the rule engine and hits the LLM, Tagsmith sends:
 
 Raw MIME, full HTML, and attachment contents are not uploaded by Tagsmith.
 
-Provider retention policies are **outside** Tagsmith’s control — prefer providers with zero-retention options for production/SaaS (**Phase 6**).
+Provider retention policies are **outside** Tagsmith’s control — prefer providers with zero-retention options.
 
 ## What is stored locally
 
@@ -55,9 +55,7 @@ OAuth consent screen app name must remain **Tagsmith**. Google rejects names tha
 | Token compromised | Revoke app access in Google Account settings; delete local `token.json`; re-`auth` |
 | Bad new category approved | Mark rejected in taxonomy / delete Gmail label; stop using key |
 
-## Future SaaS (Phase 6) expectations
+## Future SaaS (Phase 6)
 
-Not implemented yet. Full plan: [PHASE6.md](PHASE6.md) (operator in India, no
-Pvt Ltd v1, PayPal not Stripe, $12 Pro, 7-day conditional refund, DPDP/GDPR/
-Google Limited Use, body TTL). Phase 5 already lands local API + token
-encryption foundations.
+**Not pursuing** as a consumer/hosted product. See [PHASE6.md](PHASE6.md).
+Local hard rules above still apply to anyone running Tagsmith on their machine.

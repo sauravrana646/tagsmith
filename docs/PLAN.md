@@ -17,7 +17,7 @@ Two objectives held at once: a sellable product, and a hands-on path through LLM
 - **Orchestration/classifier**: [Pydantic AI](https://ai.pydantic.dev) — typed outputs via Pydantic schemas, model-agnostic (OpenAI/Anthropic/Gemini/Ollama), `TestModel`/`FunctionModel` for tests without API calls. Right fit because the core problem is *reliable structured output*, not multi-agent orchestration.
 - **Gmail**: `google-api-python-client` + `google-auth-oauthlib`, scopes `gmail.modify` (read + apply labels) and `gmail.labels` (create). Deliberately **not** `https://mail.google.com/` — that is a restricted scope requiring a paid annual CASA Tier 2 assessment, while `gmail.modify` is only *sensitive* (free Google review).
 - **CLI**: Typer + Rich. **Storage**: SQLite via SQLAlchemy/SQLModel (swap to Postgres later). **Config**: pydantic-settings. **Retries**: tenacity.
-- **Later**: hashing/SQLite RAG (Phase 3), `mcp` / FastMCP (Phase 4), FastAPI + Next.js local product API (Phase 5), hosted SaaS (Phase 6 — [PHASE6.md](PHASE6.md)).
+- **Later**: hashing/SQLite RAG (Phase 3), `mcp` / FastMCP (Phase 4), FastAPI + Next.js local product API (Phase 5). Public hosted SaaS is **not** an active goal ([PHASE6.md](PHASE6.md)).
 - **Deferred on purpose**: LangGraph. Bring it in only when the approval loop needs durable pause/resume across restarts; for a batch job with a DB-backed queue it is unnecessary weight.
 
 ## Architecture
@@ -116,9 +116,11 @@ Seed categories: `payment-sent`, `payment-received`, `bill-due`, `subscription-r
 
 **Phase 4 — Continuous operation and MCP.** Incremental sync with `users.history.list` from a stored `historyId`. Local watch lease helpers + scheduler polling (or loop). An MCP server exposing `list_unread`, `classify_message`, `apply_label`, `propose_category`, `approve_proposal` so Cursor/Claude can drive the mailbox conversationally. **Hosted Pub/Sub push is Phase 6.**
 
-**Phase 5 — Product foundation (local / single-user API).** FastAPI wrapping the service layer, web OAuth for the operator, Fernet-encrypted refresh tokens, a Next.js review dashboard, and billing *hooks* (plan list + optional Stripe webhook). SQLite by default; optional Postgres URL for experiments. **Payments, Google verification, and multi-tenant RAG isolation are Phase 6** ([PHASE6.md](PHASE6.md)).
+**Phase 5 — Product foundation (local / single-user API).** FastAPI wrapping the service layer, web OAuth for the operator, Fernet-encrypted refresh tokens, a Next.js review dashboard, and billing *hooks*. SQLite by default. **No public hosted SaaS** ([PHASE6.md](PHASE6.md)).
 
-**Phase 6 — SaaS (final).** Hosted deploy, verified web OAuth, payments (PayPal first), Pro pricing and refunds, Pub/Sub push, Postgres isolation. See [PHASE6.md](PHASE6.md).
+**Phase 6** was explored (hosted SaaS, then a non-tech desktop app) and **dropped**
+as too heavy for normal users and for a solo operator. Tagsmith stays local.
+See [PHASE6.md](PHASE6.md).
 
 ## Risks
 
@@ -132,7 +134,7 @@ Seed categories: `payment-sent`, `payment-received`, `bill-due`, `subscription-r
 
 1. **LLM provider and cost ceiling** — resolved: Pydantic AI model string, default small hosted model.
 2. **v1 shape** — local CLI, SQLite, desktop OAuth.
-3. **Where approvals happen** — CLI in Phase 1; Phase 5 adds dashboard; Phase 6 is public SaaS.
+3. **Where approvals happen** — CLI in Phase 1; Phase 5 adds a local dashboard.
 4. **One label per email or several?** — exactly one primary label.
 
 ## Task checklist
@@ -145,4 +147,4 @@ Seed categories: `payment-sent`, `payment-received`, `bill-due`, `subscription-r
 - [x] **Phase 3 — RAG**: embed labeled emails into a vector store, retrieve k nearest as dynamic few-shot examples, measure lift against the Phase 2 baseline (`docs/RAG.md`; live leave-one-out **0.982** vs Phase 2 **0.972** — merged to `main`).
 - [ ] **Phase 4 — Continuous operation and MCP**: local incremental sync via history API, watch lease helpers, scheduler polling, MCP server (`docs/OPS.md`, branch `feature/phase-4-5-ops-product`).
 - [ ] **Phase 5 — Product foundation**: FastAPI + web OAuth + encrypted tokens + review dashboard + billing hooks (`docs/PRODUCT.md`, same branch).
-- [ ] **Phase 6 — SaaS (final)**: hosted deploy, Google verification, PayPal (not Stripe v1), Pro $12 + conditional refunds, Postgres isolation (`docs/PHASE6.md`).
+- [ ] **Phase 6 — public SaaS / consumer app**: **dropped** as an active goal. Local technical tool only (`docs/PHASE6.md`).

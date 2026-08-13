@@ -8,8 +8,8 @@ Wrap the existing service layer with a FastAPI backend, web OAuth for the
 operator, encrypted refresh tokens, a Next.js review dashboard, and billing
 **hooks** — without rewriting classify/sync/review logic.
 
-This is the **local / single-user product API**, not the public SaaS launch.
-Hosted work lives in **Phase 6** — see [PHASE6.md](PHASE6.md).
+This is the **local / single-user product API**. There is no public SaaS launch
+planned — see [PHASE6.md](PHASE6.md).
 
 ## What’s included in this pass
 
@@ -52,17 +52,13 @@ After Google login, the API redirects to `TAGSMITH_WEB_APP_URL` (default `http:/
 
 Dry-run remains the default on mutating endpoints (`apply=false`).
 
-## Deferred to Phase 6 (SaaS final)
+## Deferred / dropped (Phase 6)
 
-See [PHASE6.md](PHASE6.md).
-
-- [ ] Google OAuth **sensitive-scope verification** (privacy policy, domain, demo video)
-- [ ] PayPal invoicing (v1); Paddle/Razorpay later — **not** Stripe Checkout
-- [ ] Per-tenant DB isolation / optional pgvector RAG
-- [ ] Production Pub/Sub push → incremental sync
-- [ ] Hosted deploy (API + web + Postgres)
+Public hosted SaaS and a non-tech desktop wizard are **not** the product.
+See [PHASE6.md](PHASE6.md). This repo stays a local API + dashboard for an
+operator who can run SETUP.
 
 ## Privacy reminder
 
-Email bodies are sensitive. Prefer zero-retention LLM providers before inviting
-external users in Phase 6. See [PRIVACY.md](PRIVACY.md) and [PHASE6.md](PHASE6.md).
+Email bodies are sensitive. Prefer zero-retention LLM providers. See
+[PRIVACY.md](PRIVACY.md).
