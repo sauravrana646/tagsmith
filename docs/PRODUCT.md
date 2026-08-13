@@ -8,8 +8,8 @@ Wrap the existing service layer with a FastAPI backend, web OAuth for the
 operator, encrypted refresh tokens, a Next.js review dashboard, and billing
 **hooks** — without rewriting classify/sync/review logic.
 
-This is the **local / single-user product API**. There is no public SaaS launch
-planned — see [PHASE6.md](PHASE6.md).
+This is the **operator dogfood API** (local). The **customer product** is hosted
+SaaS in Phase 6 — see [PHASE6.md](PHASE6.md). Customers will not install this.
 
 ## What’s included in this pass
 
@@ -52,11 +52,12 @@ After Google login, the API redirects to `TAGSMITH_WEB_APP_URL` (default `http:/
 
 Dry-run remains the default on mutating endpoints (`apply=false`).
 
-## Deferred / dropped (Phase 6)
+## Phase 6 (customer product)
 
-Public hosted SaaS and a non-tech desktop wizard are **not** the product.
-See [PHASE6.md](PHASE6.md). This repo stays a local API + dashboard for an
-operator who can run SETUP.
+The **customer** product is hosted SaaS (browser, our Google OAuth, our LLM).
+Local CLI is **not** shipped to customers. Plan: [PHASE6.md](PHASE6.md).
+
+Desktop installers and BYOK “run it on their PC” are **dropped**.
 
 ## Privacy reminder
 

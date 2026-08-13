@@ -1,6 +1,6 @@
 # Design document
 
-Status: **Phase 0–3 on main; Phase 4+5 local product in progress; public SaaS not an active goal**  
+Status: **Phase 0–3 on main; Phase 4+5 operator stack in progress; Phase 6 hosted SaaS is the customer product**  
 Related: [PLAN.md](PLAN.md), [DECISIONS.md](DECISIONS.md), [PRIVACY.md](PRIVACY.md), [OPS.md](OPS.md), [PRODUCT.md](PRODUCT.md), [PHASE6.md](PHASE6.md)
 
 ## 1. Goals
@@ -11,8 +11,8 @@ Related: [PLAN.md](PLAN.md), [DECISIONS.md](DECISIONS.md), [PRIVACY.md](PRIVACY.
 4. **Learning path:** structured output → evals → RAG → MCP/API without rewriting the core.
 
 Non-goals for early phases: LangGraph, empty stub modules. Phase 4 adds MCP + local
-incremental sync; Phase 5 adds FastAPI + dashboard foundation; Phase 6 is hosted
-SaaS (see OPS.md / PRODUCT.md / PHASE6.md).
+incremental sync; Phase 5 adds FastAPI + dashboard foundation. Phase 6 is **hosted
+SaaS as the only customer surface** (see [PHASE6.md](PHASE6.md)).
 
 ## 2. High-level architecture
 

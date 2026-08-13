@@ -1,20 +1,19 @@
 # Tagsmith
 
-**Tagsmith** is a local Python CLI that classifies unread Gmail into a managed taxonomy
-(`payment-sent`, `shipping-update`, `security-alert`, …), applies nested `AI/...` labels,
-and queues **category proposals** when nothing fits — so humans grow the taxonomy on purpose.
+**Tagsmith** classifies unread Gmail into a managed taxonomy (`payment-sent`,
+`shipping-update`, `security-alert`, …), applies nested `AI/...` labels, and
+queues **category proposals** when nothing fits.
 
-It is both:
-
-1. a **usable mailbox assistant** you can run today, and  
-2. a **learning path** through structured LLM output, evals, RAG, and (later) MCP/SaaS.
+**Customer product (Phase 6):** hosted web app — Sign in with Google, no install.
+**This repo today:** local Python CLI + dashboard used to **build and dogfood**
+that service. Customers will not run `uv` or create a GCP OAuth client.
 
 Phase **0–3** are on `main` (Gmail plumbing, rules, classifier, review, evals, RAG).  
 **Phase 4+5** (continuous sync/MCP + product API/dashboard foundation) are in progress on
 `feature/phase-4-5-ops-product` — see [docs/OPS.md](docs/OPS.md) and
 [docs/PRODUCT.md](docs/PRODUCT.md).  
-**Phase 6** — not pursuing consumer SaaS or a non-tech installer; local tool only.
-See [docs/PHASE6.md](docs/PHASE6.md).
+**Phase 6** — **hosted SaaS is the product** (browser only; no customer local
+install). Plan: [docs/PHASE6.md](docs/PHASE6.md).
 
 ---
 
@@ -46,7 +45,7 @@ See [docs/PHASE6.md](docs/PHASE6.md).
 - Phase 3: RAG few-shot retrieval over labeled examples (`tagsmith eval --rag`)
 - Phase 4 (branch): incremental sync, Gmail watch helpers, scheduler polling, MCP server, RAG catch-up in the background
 - Phase 5 (branch): FastAPI + web OAuth + Next.js review dashboard + billing hooks
-- Phase 6: **dropped** as a consumer/SaaS goal — [docs/PHASE6.md](docs/PHASE6.md)
+- Phase 6 (planned): **hosted SaaS** is the customer product — [docs/PHASE6.md](docs/PHASE6.md)
 
 ---
 

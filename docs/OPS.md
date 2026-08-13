@@ -8,7 +8,7 @@ Stop full unread scans as the only path. Keep a Gmail `historyId`, sync
 incrementally, renew `users.watch` leases, schedule periodic ticks, and expose
 the same service layer over MCP.
 
-**Local / dogfood first.** Hosted Pub/Sub is **not** an active product goal —
+**Local / operator dogfood first.** Hosted Pub/Sub for **customers** is Phase 6 —
 see [PHASE6.md](PHASE6.md).
 
 ## Pieces
@@ -41,7 +41,7 @@ TAGSMITH_ENABLE_BACKGROUND_SYNC=true
 TAGSMITH_BACKGROUND_SYNC_APPLY=false
 ```
 
-Until Phase 6 wires a hosted push subscription, prefer leaving `tagsmith api` running (background tick) or:
+Until Phase 6 wires hosted Pub/Sub, prefer leaving `tagsmith api` running (background tick) or:
 
 ```bash
 uv run tagsmith schedule run --loop --interval 300
@@ -59,4 +59,4 @@ to write labels to Gmail from the loop.
 - [x] Scheduler tick (sync + renew + RAG catch-up)
 - [x] In-process background loop on `tagsmith api`
 - [x] MCP server wrapping service layer
-- [ ] Live Pub/Sub push receiver in production deploy → **Phase 6**
+- [ ] Live Pub/Sub push receiver in production — **Phase 6** (see [PHASE6.md](PHASE6.md))

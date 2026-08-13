@@ -132,15 +132,14 @@ On approve: create Gmail label, insert taxonomy row, apply to the triggering mes
 - Dry-run remains default (`apply=false`) for CLI, MCP tools, and API mutations.
 - Tenant refresh tokens are Fernet-encrypted with `TAGSMITH_TOKEN_ENCRYPTION_KEY`.
 - SQLite remains the default DB; optional Postgres URL is experimental in Phase 5.
-- Billing **hooks** only (plan list). No public checkout.
+- Billing **hooks** only in Phase 5. Public PayPal checkout is Phase 6.
 - Next.js dashboard lives in `web/` and talks to the FastAPI review endpoints.
 
-## Phase 6 — not a consumer / hosted product
+## Phase 6 — hosted SaaS is the customer product
 
-**Dropped as an active goal** (see [PHASE6.md](PHASE6.md)). Do **not** implement
-public SaaS, a non-tech desktop installer, or Stripe checkout in Phase 4/5.
-
-Phase 4/5 stay local: CLI, optional dashboard, operator’s own OAuth + LLM keys.
+Local CLI / BYOK / desktop installer are **not** customer paths (see
+[PHASE6.md](PHASE6.md)). Phase 4/5 stay as **operator dogfood**. Do not ship
+Stripe checkout in 4/5; PayPal + verification are Phase 6.
 
 ## Explicit non-goals for Phase 4/5
 

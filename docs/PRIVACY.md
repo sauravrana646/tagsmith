@@ -57,5 +57,6 @@ OAuth consent screen app name must remain **Tagsmith**. Google rejects names tha
 
 ## Future SaaS (Phase 6)
 
-**Not pursuing** as a consumer/hosted product. See [PHASE6.md](PHASE6.md).
-Local hard rules above still apply to anyone running Tagsmith on their machine.
+**This is the customer product.** Hosted web app; we process truncated mail on
+our servers. Hard rules above still apply, plus retention/TTL in
+[PHASE6.md](PHASE6.md). Local CLI is operator-only.
