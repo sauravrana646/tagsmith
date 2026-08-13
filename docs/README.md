@@ -13,6 +13,7 @@
 | [PRODUCT.md](PRODUCT.md) | Phase 5 FastAPI, web OAuth, dashboard, billing hooks |
 | [SAAS.md](SAAS.md) | Phase 6 pointer |
 | [PHASE6.md](PHASE6.md) | Phase 6: hosted SaaS is the product; no customer local install |
+| [../policies/README.md](../policies/README.md) | Draft customer policies (privacy, terms, Limited Use, …) |
 | [PLAN.md](PLAN.md) | Full multi-phase product + learning plan |
 | [DECISIONS.md](DECISIONS.md) | Locked product and engineering decisions |
 
