@@ -9,7 +9,7 @@ operator, encrypted refresh tokens, a Next.js review dashboard, and billing
 **hooks** — without rewriting classify/sync/review logic.
 
 This is the **local / single-user product API**, not the public SaaS launch.
-Hosted multi-tenant work lives in **Phase 6** — see [SAAS.md](SAAS.md).
+Hosted work lives in **Phase 6** — see [PHASE6.md](PHASE6.md).
 
 ## What’s included in this pass
 
@@ -54,13 +54,15 @@ Dry-run remains the default on mutating endpoints (`apply=false`).
 
 ## Deferred to Phase 6 (SaaS final)
 
+See [PHASE6.md](PHASE6.md).
+
 - [ ] Google OAuth **sensitive-scope verification** (privacy policy, domain, demo video)
-- [ ] Stripe Checkout UI + customer portal
-- [ ] Per-tenant DB isolation / pgvector RAG migration
+- [ ] PayPal invoicing (v1); Paddle/Razorpay later — **not** Stripe Checkout
+- [ ] Per-tenant DB isolation / optional pgvector RAG
 - [ ] Production Pub/Sub push → incremental sync
 - [ ] Hosted deploy (API + web + Postgres)
 
 ## Privacy reminder
 
 Email bodies are sensitive. Prefer zero-retention LLM providers before inviting
-external users in Phase 6. See [PRIVACY.md](PRIVACY.md) and [SAAS.md](SAAS.md).
+external users in Phase 6. See [PRIVACY.md](PRIVACY.md) and [PHASE6.md](PHASE6.md).

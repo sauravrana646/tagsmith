@@ -1,7 +1,7 @@
 # Design document
 
 Status: **Phase 0–3 on main; Phase 4+5 product foundation in progress; Phase 6 SaaS deferred**  
-Related: [PLAN.md](PLAN.md), [DECISIONS.md](DECISIONS.md), [PRIVACY.md](PRIVACY.md), [OPS.md](OPS.md), [PRODUCT.md](PRODUCT.md), [SAAS.md](SAAS.md)
+Related: [PLAN.md](PLAN.md), [DECISIONS.md](DECISIONS.md), [PRIVACY.md](PRIVACY.md), [OPS.md](OPS.md), [PRODUCT.md](PRODUCT.md), [PHASE6.md](PHASE6.md)
 
 ## 1. Goals
 
@@ -12,7 +12,7 @@ Related: [PLAN.md](PLAN.md), [DECISIONS.md](DECISIONS.md), [PRIVACY.md](PRIVACY.
 
 Non-goals for early phases: LangGraph, empty stub modules. Phase 4 adds MCP + local
 incremental sync; Phase 5 adds FastAPI + dashboard foundation; Phase 6 is hosted
-SaaS (see OPS.md / PRODUCT.md / SAAS.md).
+SaaS (see OPS.md / PRODUCT.md / PHASE6.md).
 
 ## 2. High-level architecture
 

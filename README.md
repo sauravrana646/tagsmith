@@ -13,8 +13,8 @@ Phase **0–3** are on `main` (Gmail plumbing, rules, classifier, review, evals,
 **Phase 4+5** (continuous sync/MCP + product API/dashboard foundation) are in progress on
 `feature/phase-4-5-ops-product` — see [docs/OPS.md](docs/OPS.md) and
 [docs/PRODUCT.md](docs/PRODUCT.md).  
-**Phase 6 (SaaS final)** — hosted Pub/Sub, Stripe Checkout, Google verification, multi-tenant
-pgvector — is planned separately: [docs/SAAS.md](docs/SAAS.md).
+**Phase 6 (SaaS final)** — hosted deploy, Google verification, PayPal (not Stripe v1),
+Pro $12 — is planned in [docs/PHASE6.md](docs/PHASE6.md).
 
 ---
 

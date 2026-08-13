@@ -57,8 +57,7 @@ OAuth consent screen app name must remain **Tagsmith**. Google rejects names tha
 
 ## Future SaaS (Phase 6) expectations
 
-Not implemented yet. Final phase calls for hosted Pub/Sub push, Stripe Checkout,
-Google sensitive-scope verification, encrypted per-tenant tokens at scale,
-hash/embedding-first storage with pgvector isolation, and a published data
-policy. Phase 5 already lands local API + token encryption foundations.
-See [SAAS.md](SAAS.md) and [PLAN.md](PLAN.md).
+Not implemented yet. Full plan: [PHASE6.md](PHASE6.md) (operator in India, no
+Pvt Ltd v1, PayPal not Stripe, $12 Pro, 7-day conditional refund, DPDP/GDPR/
+Google Limited Use, body TTL). Phase 5 already lands local API + token
+encryption foundations.

@@ -132,7 +132,7 @@ On approve: create Gmail label, insert taxonomy row, apply to the triggering mes
 - Dry-run remains default (`apply=false`) for CLI, MCP tools, and API mutations.
 - Tenant refresh tokens are Fernet-encrypted with `TAGSMITH_TOKEN_ENCRYPTION_KEY`.
 - SQLite remains the default DB; optional Postgres URL is experimental in Phase 5.
-- Billing **hooks** only (plan list + Stripe webhook). Checkout UI is Phase 6.
+- Billing **hooks** only (plan list + optional Stripe webhook). Public checkout is Phase 6 (PayPal first).
 - Next.js dashboard lives in `web/` and talks to the FastAPI review endpoints.
 
 ## Phase 6 — SaaS (final) — deferred
@@ -140,12 +140,12 @@ On approve: create Gmail label, insert taxonomy row, apply to the triggering mes
 Do **not** implement in Phase 4/5:
 
 1. Hosted Pub/Sub push → incremental sync
-2. Stripe Checkout UI + customer portal
+2. Public payments (PayPal v1; Stripe is not the v1 rail)
 3. Google OAuth sensitive-scope verification (privacy policy, domain, demo video)
-4. Postgres + pgvector multi-tenant RAG isolation
+4. Postgres + per-tenant RAG isolation
 5. Production multi-tenant deploy
 
-Tracked in [SAAS.md](SAAS.md) / [PLAN.md](PLAN.md).
+Tracked in [PHASE6.md](PHASE6.md) / [PLAN.md](PLAN.md).
 
 ## Explicit non-goals for Phase 4/5
 
