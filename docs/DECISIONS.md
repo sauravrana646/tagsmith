@@ -124,6 +124,24 @@ On approve: create Gmail label, insert taxonomy row, apply to the triggering mes
   **0.972** (+0.010). Remaining 2 misses are holds, not mislabels. Keep hashing
   embedder for now; hosted embeddings optional if real-inbox lift stalls.
 
-## Explicit non-goals for this pass
+## Phase 4 + 5 (ops / product foundation) — locked while on the combined branch
 
-No LangGraph, no web UI, no vector DB, no MCP, and no empty placeholder modules for them.
+- Keep the service layer as the only business-logic surface; MCP + FastAPI are thin.
+- Incremental sync uses Gmail `historyId` in `sync_state`; stale history falls back to full unread.
+- Local scheduler **polls** history; `users.watch` lease helpers exist for when Pub/Sub is configured.
+- Dry-run remains default (`apply=false`) for CLI, MCP tools, and API mutations.
+- Tenant refresh tokens are Fernet-encrypted with `TAGSMITH_TOKEN_ENCRYPTION_KEY`.
+- SQLite remains the default DB; optional Postgres URL is experimental in Phase 5.
+- Billing **hooks** only in Phase 5. Public PayPal checkout is Phase 6.
+- Next.js dashboard lives in `web/` and talks to the FastAPI review endpoints.
+
+## Phase 6 — hosted SaaS is the customer product
+
+Local CLI / BYOK / desktop installer are **not** customer paths (see
+[PHASE6.md](PHASE6.md)). Phase 4/5 stay as **operator dogfood**. Do not ship
+Stripe checkout in 4/5; PayPal + verification are Phase 6.
+
+## Explicit non-goals for Phase 4/5
+
+No LangGraph. No empty placeholder modules for Phase 6 SaaS items. No restricted
+Gmail scopes.

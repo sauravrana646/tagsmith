@@ -18,6 +18,7 @@ from tagsmith.db.models import (
     ReviewStatus,
     utcnow,
 )
+from tagsmith.db.session import LOCAL_TENANT_ID
 from tagsmith.gmail.protocol import GmailGateway
 from tagsmith.review.queue import ReviewService
 from tagsmith.services.sync import SyncResult, SyncService
@@ -39,11 +40,14 @@ class ReviewOps:
         session: Session,
         gmail: GmailGateway,
         settings: Settings,
+        *,
+        tenant_id: int = LOCAL_TENANT_ID,
     ) -> None:
         self.session = session
         self.gmail = gmail
         self.settings = settings
-        self.queue = ReviewService(session)
+        self.tenant_id = tenant_id
+        self.queue = ReviewService(session, tenant_id=tenant_id)
         self.taxonomy = TaxonomyRegistry(session, settings)
 
     def _index_for_rag(self, message: Message, label_key: str) -> None:
@@ -83,10 +87,8 @@ class ReviewOps:
         return self.queue.list_held()
 
     def _needs_review_label_id(self) -> str | None:
-        for label in self.gmail.list_labels():
-            if label.get("name") == self.settings.needs_review_label_name:
-                return str(label.get("id") or "") or None
-        return None
+        label = self.gmail.get_or_create_label(self.settings.needs_review_label_name)
+        return str(label.get("id") or "") or None
 
     def _close_pending_proposals_for_message(self, gmail_id: str) -> None:
         pending = self.session.exec(
@@ -254,7 +256,15 @@ class ReviewOps:
         if apply:
             label = self.gmail.get_or_create_label(self.settings.gmail_label_name(key))
             label_id = str(label.get("id") or "")
-            self.gmail.modify_labels(proposal.gmail_id, add_label_ids=[label_id])
+            remove_ids: list[str] = []
+            review_id = self._needs_review_label_id()
+            if review_id:
+                remove_ids.append(review_id)
+            self.gmail.modify_labels(
+                proposal.gmail_id,
+                add_label_ids=[label_id],
+                remove_label_ids=remove_ids,
+            )
 
         self.taxonomy.activate_category(
             key,
@@ -293,9 +303,13 @@ class ReviewOps:
         self.session.commit()
         log.info("proposal.approved", proposal_id=proposal_id, key=key)
 
-        # Re-classify remaining held messages inside approve.
-        sync = SyncService(self.session, self.gmail, self.settings)
-        return await sync.reclassify_held(apply=apply)
+        # Re-classify remaining held messages waiting on this category.
+        sync = SyncService(self.session, self.gmail, self.settings, tenant_id=self.tenant_id)
+        return await sync.reclassify_held(
+            apply=apply,
+            label_key=key,
+            exclude_gmail_ids={proposal.gmail_id},
+        )
 
     def reject_proposal(self, proposal_id: int) -> Proposal:
         return self.queue.reject_proposal(proposal_id)
@@ -391,11 +405,23 @@ class ReviewOps:
         if not final:
             raise ValueError("nothing to confirm")
 
-        if apply and message.applied_label_id is None:
-            label = self.gmail.get_or_create_label(self.settings.gmail_label_name(final))
-            label_id = str(label.get("id") or "")
-            self.gmail.modify_labels(gmail_id, add_label_ids=[label_id])
-            message.applied_label_id = label_id
+        if apply:
+            add_ids: list[str] = []
+            if message.applied_label_id is None:
+                label = self.gmail.get_or_create_label(self.settings.gmail_label_name(final))
+                label_id = str(label.get("id") or "")
+                add_ids.append(label_id)
+                message.applied_label_id = label_id
+            remove_ids: list[str] = []
+            review_id = self._needs_review_label_id()
+            if review_id:
+                remove_ids.append(review_id)
+            if add_ids or remove_ids:
+                self.gmail.modify_labels(
+                    gmail_id,
+                    add_label_ids=add_ids,
+                    remove_label_ids=remove_ids,
+                )
 
         record.final_key = final
         record.label_key = final
@@ -426,10 +452,12 @@ class ReviewOps:
 
         label_id: str | None = message.applied_label_id
         if apply:
-            # Remove previous category label if present; keep needs-review removal optional.
             remove_ids: list[str] = []
             if message.applied_label_id:
                 remove_ids.append(message.applied_label_id)
+            review_id = self._needs_review_label_id()
+            if review_id:
+                remove_ids.append(review_id)
             label = self.gmail.get_or_create_label(self.settings.gmail_label_name(new_key))
             label_id = str(label.get("id") or "")
             self.gmail.modify_labels(
@@ -495,15 +523,35 @@ class ReviewOps:
             why_no_existing_fit=why,
         )
         if proposal is None:
-            # Dedupe hit — fetch existing
+            from sqlalchemy.exc import IntegrityError
+
             from tagsmith.review.queue import proposal_dedupe_key
 
             dedupe = proposal_dedupe_key(suggested_key, description)
-            proposal = self.session.exec(
-                select(Proposal).where(
-                    Proposal.status == ProposalStatus.PENDING,
-                    Proposal.dedupe_key == dedupe,
-                )
-            ).one()
+            try:
+                proposal = self.session.exec(
+                    select(Proposal).where(
+                        Proposal.status == ProposalStatus.PENDING,
+                        Proposal.dedupe_key == dedupe,
+                        Proposal.gmail_id == gmail_id,
+                    )
+                ).first()
+            except IntegrityError:
+                self.session.rollback()
+                proposal = self.session.exec(
+                    select(Proposal).where(
+                        Proposal.status == ProposalStatus.PENDING,
+                        Proposal.dedupe_key == dedupe,
+                    )
+                ).first()
+            if proposal is None:
+                proposal = self.session.exec(
+                    select(Proposal).where(
+                        Proposal.status == ProposalStatus.PENDING,
+                        Proposal.dedupe_key == dedupe,
+                    )
+                ).first()
+            if proposal is None:
+                raise RuntimeError("failed to enqueue or locate proposal")
         self.session.commit()
         return proposal

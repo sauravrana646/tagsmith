@@ -3,6 +3,7 @@ name: CI
 on:
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -25,12 +26,12 @@ jobs:
       security-events: write
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
 
       - name: Secret scan (Gitleaks)
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -56,16 +57,24 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
         with:
           enable-cache: true
           python-version: ${{ matrix.python-version }}
 
       - name: Sync dependencies
         run: uv sync --group dev --frozen
+
+      - name: Validate package / CLI
+        run: |
+          set -euo pipefail
+          uv run python -c "import tagsmith; print(tagsmith.__version__ if hasattr(tagsmith,'__version__') else 'ok')"
+          uv run tagsmith --help >/dev/null
+          test -f src/tagsmith/taxonomy/seed.yaml
+          test -f src/tagsmith/classify/builtin_rules.yaml
 
       - name: Ruff lint
         run: uv run ruff check src tests
@@ -77,19 +86,59 @@ jobs:
         run: uv run mypy src
 
       - name: Pytest
-        run: uv run pytest -q
+        run: uv run pytest -q --junitxml=pytest-results.xml
+
+      - name: Upload pytest report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: pytest-py${{ matrix.python-version }}
+          path: pytest-results.xml
+          if-no-files-found: ignore
+
+  web-validate:
+    name: Web typecheck
+    runs-on: ubuntu-latest
+    needs: secret-scan
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install and typecheck
+        working-directory: web
+        run: |
+          set -euo pipefail
+          if [ ! -f package.json ]; then
+            echo "No web/package.json — skipping."
+            exit 0
+          fi
+          npm ci
+          npx tsc --noEmit
+          npm audit --audit-level=critical
+          test -f package.json
 
   security:
     name: Dependency and SAST
     runs-on: ubuntu-latest
     needs: secret-scan
     timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
         with:
           enable-cache: true
           python-version: "3.12"
@@ -97,13 +146,57 @@ jobs:
       - name: Sync dependencies
         run: uv sync --group dev --frozen
 
-      - name: Dependency vulnerability audit
+      - name: Dependency vulnerability audit (pip-audit)
         run: |
+          set -euo pipefail
           uv export --frozen --no-emit-project --no-dev --no-hashes -o /tmp/requirements.txt
-          uv run pip-audit -r /tmp/requirements.txt --strict
+          set +e
+          uv run pip-audit -r /tmp/requirements.txt --strict --format json --output /tmp/pip-audit.json
+          json_status=$?
+          uv run pip-audit -r /tmp/requirements.txt --strict --format columns | tee /tmp/pip-audit.txt
+          columns_status=$?
+          set -e
+          {
+            echo "### pip-audit"
+            echo '```'
+            cat /tmp/pip-audit.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$json_status" -ne 0 ] || [ "$columns_status" -ne 0 ]; then
+            echo "::error::pip-audit found vulnerable dependencies"
+            exit 1
+          fi
 
       - name: Bandit (Python SAST)
-        run: uv run bandit -r src -ll -q -c pyproject.toml
+        run: |
+          set -euo pipefail
+          set +e
+          uv run bandit -r src -ll -q -c pyproject.toml -f json -o /tmp/bandit.json
+          json_status=$?
+          uv run bandit -r src -ll -q -c pyproject.toml | tee /tmp/bandit.txt
+          text_status=$?
+          set -e
+          {
+            echo "### Bandit"
+            echo '```'
+            cat /tmp/bandit.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$json_status" -ne 0 ] || [ "$text_status" -ne 0 ]; then
+            echo "::error::Bandit reported medium/high findings"
+            exit 1
+          fi
+
+      - name: Upload vulnerability reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: security-reports
+          path: |
+            /tmp/pip-audit.json
+            /tmp/bandit.json
+            /tmp/bandit.txt
+          if-no-files-found: ignore
 
   # Single required status check for branch protection on `main`.
   # GitHub → Settings → Branches → Protect `main` →
@@ -112,13 +205,14 @@ jobs:
     name: quality-gate
     runs-on: ubuntu-latest
     if: always()
-    needs: [secret-scan, lint-test, security]
+    needs: [secret-scan, lint-test, web-validate, security]
     steps:
       - name: Enforce all CI jobs passed
         run: |
           set -euo pipefail
           echo "secret-scan: ${{ needs.secret-scan.result }}"
           echo "lint-test: ${{ needs.lint-test.result }}"
+          echo "web-validate: ${{ needs.web-validate.result }}"
           echo "security: ${{ needs.security.result }}"
 
           if [ "${{ needs.secret-scan.result }}" != "success" ]; then
@@ -129,8 +223,108 @@ jobs:
             echo "::error::Lint/typecheck/tests failed — merge blocked."
             exit 1
           fi
+          if [ "${{ needs.web-validate.result }}" != "success" ]; then
+            echo "::error::Web typecheck failed — merge blocked."
+            exit 1
+          fi
           if [ "${{ needs.security.result }}" != "success" ]; then
             echo "::error::Dependency/SAST security job failed — merge blocked."
             exit 1
           fi
           echo "All quality gates passed."
+
+  pr-report:
+    name: PR quality report
+    runs-on: ubuntu-latest
+    if: always() && github.event_name == 'pull_request'
+    needs: [secret-scan, lint-test, web-validate, security, quality-gate]
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Post / update PR report comment
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        with:
+          script: |
+            const needs = {
+              'secret-scan (Gitleaks)': '${{ needs.secret-scan.result }}',
+              'lint / mypy / pytest': '${{ needs.lint-test.result }}',
+              'web typecheck': '${{ needs.web-validate.result }}',
+              'pip-audit + Bandit': '${{ needs.security.result }}',
+              'quality-gate': '${{ needs.quality-gate.result }}',
+            };
+            const icon = (r) => ({
+              success: '✅',
+              failure: '❌',
+              cancelled: '⚠️',
+              skipped: '⏭️',
+            }[r] || `❔ (${r})`);
+            const gateOk = needs['quality-gate'] === 'success';
+            const lines = Object.entries(needs).map(
+              ([name, result]) => `| ${name} | ${icon(result)} \`${result}\` |`
+            );
+            const body = [
+              '<!-- tagsmith-ci-report -->',
+              '## CI quality report',
+              '',
+              `| Check | Result |`,
+              `| --- | --- |`,
+              ...lines,
+              '',
+              gateOk
+                ? '**Quality gate passed.** Non-draft PRs are eligible for auto-merge to `main`.'
+                : '**Quality gate failed.** Fix the failing jobs above before merge.',
+              '',
+              `Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}`,
+              '',
+              '_Artifacts:_ pytest JUnit + `security-reports` (pip-audit JSON, Bandit JSON) on the workflow run.',
+            ].join('\n');
+
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const { data: comments } = await github.rest.issues.listComments({
+              owner, repo, issue_number, per_page: 100,
+            });
+            const existing = comments.find((c) =>
+              c.user?.type === 'Bot' && c.body?.includes('<!-- tagsmith-ci-report -->')
+            );
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner, repo, comment_id: existing.id, body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner, repo, issue_number, body,
+              });
+            }
+
+  auto-merge:
+    name: Auto-merge to main
+    runs-on: ubuntu-latest
+    # Merge only when the gate is green and the PR is not a draft.
+    if: >
+      always()
+      && github.event_name == 'pull_request'
+      && needs.quality-gate.result == 'success'
+      && github.event.pull_request.draft == false
+      && github.event.pull_request.base.ref == 'main'
+    needs: [quality-gate, pr-report]
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Enable auto-merge (squash) or merge when ready
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          echo "Quality gate green — merging PR #${PR_NUMBER} into main (squash)."
+          # Prefer GitHub auto-merge (respects branch protection / required checks).
+          # Fall back to immediate merge if auto-merge is unavailable.
+          if gh pr merge "$PR_NUMBER" --squash --delete-branch --auto; then
+            echo "Auto-merge enabled (or completed)."
+          else
+            echo "Auto-merge unavailable; attempting direct squash merge..."
+            gh pr merge "$PR_NUMBER" --squash --delete-branch
+          fi

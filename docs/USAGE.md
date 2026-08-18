@@ -68,6 +68,36 @@ uv run tagsmith sync --limit 20 --apply
 
 # Re-classify messages that already have SQLite decisions
 uv run tagsmith sync --limit 20 --apply --reprocess
+
+# Phase 4: incremental sync from stored Gmail historyId
+uv run tagsmith sync --incremental --limit 100
+uv run tagsmith sync --incremental --apply
+```
+
+### Phase 4 — watch / schedule / MCP
+
+```bash
+# Gmail users.watch (requires Pub/Sub topic)
+uv run tagsmith watch start --topic projects/YOUR_PROJECT/topics/tagsmith-gmail
+uv run tagsmith watch status
+uv run tagsmith watch stop
+
+# One scheduler tick (incremental sync + renew watch if needed)
+uv run tagsmith schedule run --once
+# Loop forever
+uv run tagsmith schedule run --loop --interval 300
+
+# MCP server (stdio) for Cursor/Claude
+uv run tagsmith mcp
+```
+
+### Phase 5 — API + dashboard
+
+```bash
+export TAGSMITH_TOKEN_ENCRYPTION_KEY='dev-only-change-me'
+uv run tagsmith api          # http://127.0.0.1:8080
+
+cd web && npm install && npm run dev   # http://127.0.0.1:3000
 ```
 
 #### Sync semantics

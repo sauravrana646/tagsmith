@@ -1,7 +1,7 @@
 # Design document
 
-Status: **Phase 0–2 on main; Phase 3 RAG in progress (branch)**  
-Related: [PLAN.md](PLAN.md), [DECISIONS.md](DECISIONS.md), [PRIVACY.md](PRIVACY.md)
+Status: **Phase 0–3 on main; Phase 4+5 operator stack in progress; Phase 6 hosted SaaS is the customer product**  
+Related: [PLAN.md](PLAN.md), [DECISIONS.md](DECISIONS.md), [PRIVACY.md](PRIVACY.md), [OPS.md](OPS.md), [PRODUCT.md](PRODUCT.md), [PHASE6.md](PHASE6.md)
 
 ## 1. Goals
 
@@ -10,7 +10,9 @@ Related: [PLAN.md](PLAN.md), [DECISIONS.md](DECISIONS.md), [PRIVACY.md](PRIVACY.
 3. **Unit economics:** rules catch repetitive mail; LLM handles the long tail.
 4. **Learning path:** structured output → evals → RAG → MCP/API without rewriting the core.
 
-Non-goals for v0.1: web UI, multi-tenant SaaS, LangGraph, vector DB, MCP server modules (empty stubs forbidden).
+Non-goals for early phases: LangGraph, empty stub modules. Phase 4 adds MCP + local
+incremental sync; Phase 5 adds FastAPI + dashboard foundation. Phase 6 is **hosted
+SaaS as the only customer surface** (see [PHASE6.md](PHASE6.md)).
 
 ## 2. High-level architecture
 

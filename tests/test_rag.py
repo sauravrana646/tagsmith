@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 from tagsmith.config import Settings
+from tagsmith.db.models import Message, MessageState, SyncState
 from tagsmith.db.session import get_session, init_db, reset_engine
 from tagsmith.rag.embedder import HashingEmbedder, cosine_similarity
-from tagsmith.rag.index import make_store
+from tagsmith.rag.index import catchup_from_db, make_store, rag_status_payload
 from tagsmith.rag.retriever import Retriever, format_category_hints
 from tagsmith.rag.store import example_text_from_email
 
@@ -84,3 +86,118 @@ def test_rag_eval_bootstrap_creates_table(settings: Settings, tmp_path: Path) ->
         )
         assert store.count() == 1
     reset_engine()
+
+
+def _labeled_message(
+    session: Any,
+    *,
+    gmail_id: str,
+    label_key: str,
+    state: MessageState = MessageState.LABELED,
+    subject: str = "Hello",
+) -> Message:
+    msg = Message(
+        gmail_id=gmail_id,
+        thread_id=f"t-{gmail_id}",
+        sender="a@b.com",
+        subject=subject,
+        state=state,
+        applied_label_key=label_key if state == MessageState.LABELED else None,
+        applied_label_id="L-test" if state == MessageState.LABELED else None,
+        payload_json={"sender": "a@b.com", "subject": subject, "body_text": "body"},
+    )
+    session.add(msg)
+    session.commit()
+    return msg
+
+
+def test_catchup_indexes_labeled_and_drops_stale(settings: Settings, session: Any) -> None:
+    keep = _labeled_message(session, gmail_id="keep-1", label_key="otp-verification")
+    _labeled_message(
+        session,
+        gmail_id="held-1",
+        label_key="promotion",
+        state=MessageState.HELD,
+        subject="held",
+    )
+    store = make_store(session, settings)
+    store.upsert(
+        gmail_id="stale-1",
+        label_key="newsletter",
+        sender="x@y.com",
+        subject="old",
+        body_excerpt="gone",
+    )
+    result = catchup_from_db(session, settings)
+    assert result.indexed >= 1
+    assert result.removed == 1
+    assert result.total == 1
+    remaining = make_store(session, settings)
+    hits = remaining.query_similar("From: a@b.com Subject: Hello body", k=3)
+    assert any(h[0].label_key == "otp-verification" for h in hits)
+    assert remaining.count() == 1
+    assert session.get(SyncState, 1) is not None
+    assert session.get(SyncState, 1).last_rag_indexed == result.indexed
+    assert keep.gmail_id == "keep-1"
+
+
+def test_catchup_skips_labeled_without_applied_label_id(settings: Settings, session: Any) -> None:
+    session.add(
+        Message(
+            gmail_id="dry-1",
+            thread_id="t-dry",
+            sender="a@b.com",
+            subject="dry",
+            state=MessageState.LABELED,
+            applied_label_key="otp-verification",
+            applied_label_id=None,
+            payload_json={"sender": "a@b.com", "subject": "dry", "body_text": "x"},
+        )
+    )
+    session.commit()
+    result = catchup_from_db(session, settings)
+    assert result.indexed == 0
+    assert make_store(session, settings).count() == 0
+
+
+def test_catchup_updates_changed_label(settings: Settings, session: Any) -> None:
+    _labeled_message(session, gmail_id="m1", label_key="promotion")
+    catchup_from_db(session, settings)
+    msg = session.get(Message, "m1")
+    assert msg is not None
+    msg.applied_label_key = "newsletter"
+    session.commit()
+    result = catchup_from_db(session, settings)
+    assert result.indexed == 1
+    assert result.removed == 0
+    store = make_store(session, settings)
+    hits = store.query_similar("From: a@b.com Subject: Hello", k=1)
+    assert hits[0][0].label_key == "newsletter"
+
+
+def test_retriever_does_not_reembed_seeds_every_call(settings: Settings, session: Any) -> None:
+    store = make_store(session, settings)
+    calls = {"n": 0}
+    inner = store.embedder
+
+    class CountingEmbedder:
+        dim = inner.dim
+
+        def embed(self, text: str) -> list[float]:
+            calls["n"] += 1
+            return inner.embed(text)
+
+    retriever = Retriever(store, CountingEmbedder(), example_k=0, category_k=2)  # type: ignore[arg-type]
+    retriever.retrieve("tax form w-2")
+    first = calls["n"]
+    retriever.retrieve("another tax form")
+    # Query is embedded each time; seed categories should be cached after the first call.
+    assert calls["n"] - first == 1
+
+
+def test_rag_status_payload(settings: Settings, session: Any) -> None:
+    payload = rag_status_payload(session, settings)
+    assert payload["enable_rag"] is True
+    assert payload["rag_example_count"] == 0
+    assert payload["background_sync"] is False
+    assert payload["last_rag_catchup_at"] is None

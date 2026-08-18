@@ -27,11 +27,20 @@ Flow on `tagsmith sync`:
 
 Human review confirms/changes also upsert into the store.
 
+**Background catch-up:** `tagsmith schedule` and the API process (`TAGSMITH_ENABLE_BACKGROUND_SYNC`, default on) periodically:
+
+1. Index any `LABELED` SQLite messages missing from `rag_examples`
+2. Drop examples whose message is no longer labeled (including Gmail user-removed)
+3. Record last catch-up time on `sync_state`
+
+Dry-run sync does **not** index inline (avoids polluting few-shots during a preview). Catch-up still learns from SQLite `LABELED` rows afterward. Held / needs-review wait for a human confirm.
+
 ## Commands
 
 ```bash
 uv run tagsmith rag status
-uv run tagsmith rag reindex          # rebuild from labeled SQLite messages
+uv run tagsmith rag catchup          # one-shot index missing / drop stale
+uv run tagsmith rag reindex          # wipe + rebuild from labeled SQLite messages
 
 # Measure lift vs Phase 2 baseline (costs LLM tokens):
 uv run tagsmith eval --json-out evals/baseline_live.json          # no RAG
@@ -48,6 +57,9 @@ TAGSMITH_ENABLE_RAG=true
 TAGSMITH_RAG_EXAMPLE_K=5
 TAGSMITH_RAG_CATEGORY_K=3
 TAGSMITH_RAG_EMBEDDING_DIM=256
+TAGSMITH_ENABLE_BACKGROUND_SYNC=true
+TAGSMITH_BACKGROUND_SYNC_APPLY=false
+TAGSMITH_SCHEDULE_INTERVAL_SECONDS=300
 ```
 
 ## Live result (recorded)
@@ -64,6 +76,7 @@ hosted embedding swap required for Phase 3 merge readiness.
 
 - [x] Example store + hashing embedder + retriever
 - [x] Wired into sync + review indexing
+- [x] Background catch-up on schedule / API loop
 - [x] `tagsmith eval --rag` leave-one-out harness
 - [x] Live RAG vs Phase 2 baseline numbers recorded in EVALS.md
 - [ ] Optional: upgrade embedder to a hosted model if hashing lift is weak (not needed yet)

@@ -34,10 +34,14 @@ labels_app = typer.Typer(help="Gmail label helpers")
 taxonomy_app = typer.Typer(help="Local taxonomy helpers")
 review_app = typer.Typer(help="Review proposals and medium-confidence labels")
 rag_app = typer.Typer(help="Phase 3 RAG example index")
+watch_app = typer.Typer(help="Phase 4 Gmail users.watch lease")
+schedule_app = typer.Typer(help="Phase 4 periodic sync + watch renewal")
 app.add_typer(labels_app, name="labels")
 app.add_typer(taxonomy_app, name="taxonomy")
 app.add_typer(review_app, name="review")
 app.add_typer(rag_app, name="rag")
+app.add_typer(watch_app, name="watch")
+app.add_typer(schedule_app, name="schedule")
 
 console = Console()
 log = get_logger(__name__)
@@ -149,6 +153,11 @@ def sync(
         "--reprocess",
         help="Reclassify messages that already have a SQLite decision.",
     ),
+    incremental: bool = typer.Option(
+        False,
+        "--incremental/--full",
+        help="Phase 4: sync from stored historyId instead of scanning all unread.",
+    ),
 ) -> None:
     """Classify unread mail; dry-run unless --apply."""
     settings = _settings()
@@ -162,13 +171,21 @@ def sync(
     with get_session(settings) as session:
         service = SyncService(session, gmail, settings)
         try:
-            result = asyncio.run(service.sync(limit=limit, apply=apply, reprocess=reprocess))
+            if incremental:
+                result = asyncio.run(
+                    service.sync_incremental(limit=limit, apply=apply, reprocess=reprocess)
+                )
+            else:
+                result = asyncio.run(service.sync(limit=limit, apply=apply, reprocess=reprocess))
         except Exception as exc:
             console.print(f"[red]sync failed: {exc}[/red]")
             raise typer.Exit(1) from exc
 
     mode = "APPLY" if apply else "DRY-RUN"
-    console.print(f"[bold]{mode}[/bold] run_id={result.run_id} counts={result.counts.as_dict()}")
+    kind = "incremental" if incremental else "full"
+    console.print(
+        f"[bold]{mode}[/bold] ({kind}) run_id={result.run_id} counts={result.counts.as_dict()}"
+    )
     for decision in result.decisions:
         conf = decision.get("confidence")
         conf_s = "null" if conf is None else f"{conf:.2f}"
@@ -242,15 +259,42 @@ def eval_export_corrections(
 @rag_app.command("status")
 def rag_status() -> None:
     """Show how many labeled examples are indexed for RAG."""
-    from tagsmith.rag.index import make_store
+    from tagsmith.rag.index import rag_status_payload
 
     settings = _settings()
     init_db(settings)
     with get_session(settings) as session:
-        n = make_store(session, settings).count()
+        payload = rag_status_payload(session, settings)
     console.print(
-        f"RAG examples indexed: [bold]{n}[/bold] "
-        f"(enable_rag={settings.enable_rag}, k={settings.rag_example_k})"
+        f"RAG examples indexed: [bold]{payload['rag_example_count']}[/bold] "
+        f"(enable_rag={payload['enable_rag']}, k={payload['rag_example_k']})"
+    )
+    if payload["last_rag_catchup_at"]:
+        console.print(
+            f"Last catch-up: {payload['last_rag_catchup_at']} "
+            f"(indexed={payload['last_rag_indexed']}, removed={payload['last_rag_removed']})"
+        )
+    else:
+        console.print("Last catch-up: never (run schedule, API background loop, or `rag catchup`)")
+    console.print(
+        f"Background sync: {payload['background_sync']} "
+        f"(apply={payload['background_sync_apply']}, "
+        f"interval={payload['schedule_interval_seconds']}s)"
+    )
+
+
+@rag_app.command("catchup")
+def rag_catchup() -> None:
+    """Index missing labeled messages and drop stale RAG examples."""
+    from tagsmith.rag.index import catchup_from_db
+
+    settings = _settings()
+    init_db(settings)
+    with get_session(settings) as session:
+        result = catchup_from_db(session, settings)
+    console.print(
+        f"[green]catch-up[/green] indexed={result.indexed} "
+        f"removed={result.removed} total={result.total}"
     )
 
 
@@ -561,6 +605,133 @@ def review_list() -> None:
     for message, held_record in held:
         predicted = held_record.predicted_key if held_record else None
         console.print(f"  held {message.gmail_id} predicted={predicted} · {message.subject[:60]}")
+
+
+@watch_app.command("status")
+def watch_status() -> None:
+    """Show stored historyId / watch lease."""
+    from tagsmith.services.watch_ops import WatchOps
+
+    settings = _settings()
+    init_db(settings)
+    try:
+        gmail = _gmail(settings)
+    except AuthError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1) from exc
+    with get_session(settings) as session:
+        status = WatchOps(session, gmail, settings).status()
+    console.print(status.as_dict())
+
+
+@watch_app.command("start")
+def watch_start(
+    topic: str | None = typer.Option(
+        None,
+        "--topic",
+        help="Pub/Sub topic (projects/.../topics/...). Defaults to TAGSMITH_PUBSUB_TOPIC.",
+    ),
+) -> None:
+    """Start or renew Gmail users.watch (expires ~7 days; renew via schedule)."""
+    from tagsmith.services.watch_ops import WatchOps
+
+    settings = _settings()
+    init_db(settings)
+    try:
+        gmail = _gmail(settings)
+    except AuthError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1) from exc
+    with get_session(settings) as session:
+        try:
+            status = WatchOps(session, gmail, settings).start_or_renew(topic_name=topic)
+        except ValueError as exc:
+            console.print(f"[red]{exc}[/red]")
+            raise typer.Exit(1) from exc
+    console.print(f"[green]watch active[/green] {status.as_dict()}")
+
+
+@watch_app.command("stop")
+def watch_stop() -> None:
+    """Stop Gmail users.watch for this mailbox."""
+    from tagsmith.services.watch_ops import WatchOps
+
+    settings = _settings()
+    init_db(settings)
+    try:
+        gmail = _gmail(settings)
+    except AuthError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1) from exc
+    with get_session(settings) as session:
+        status = WatchOps(session, gmail, settings).stop()
+    console.print(f"[yellow]watch stopped[/yellow] {status.as_dict()}")
+
+
+@schedule_app.command("run")
+def schedule_run(
+    apply: bool = typer.Option(False, "--apply"),
+    once: bool = typer.Option(True, "--once/--loop", help="Run one tick or loop forever."),
+    interval: int | None = typer.Option(None, "--interval", help="Seconds between ticks."),
+    full: bool = typer.Option(False, "--full", help="Use full unread sync instead of incremental."),
+) -> None:
+    """Periodic incremental sync, watch renewal, and RAG catch-up."""
+    from contextlib import contextmanager
+
+    from tagsmith.scheduler import run_scheduler_loop
+
+    settings = _settings()
+    init_db(settings)
+
+    @contextmanager
+    def session_factory():  # type: ignore[no-untyped-def]
+        with get_session(settings) as session:
+            yield session
+
+    def gmail_factory() -> GmailClient:
+        return _gmail(settings)
+
+    try:
+        asyncio.run(
+            run_scheduler_loop(
+                session_factory,
+                gmail_factory,
+                settings,
+                apply=apply,
+                interval_seconds=interval,
+                once=once,
+                incremental=not full,
+            )
+        )
+    except AuthError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1) from exc
+
+
+@app.command("mcp")
+def mcp_cmd() -> None:
+    """Start the MCP server (stdio) exposing Tagsmith tools."""
+    from tagsmith.mcp.server import main as mcp_main
+
+    mcp_main()
+
+
+@app.command("api")
+def api_cmd(
+    host: str | None = None,
+    port: int | None = None,
+) -> None:
+    """Start the Phase 5 FastAPI server (review dashboard + OAuth + sync API)."""
+    import uvicorn
+
+    settings = _settings()
+    init_db(settings)
+    uvicorn.run(
+        "tagsmith.api.app:app",
+        host=host or settings.api_host,
+        port=port or settings.api_port,
+        reload=False,
+    )
 
 
 def run() -> None:

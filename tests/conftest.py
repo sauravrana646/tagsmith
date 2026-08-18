@@ -6,12 +6,14 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
-from sqlmodel import Session, SQLModel, create_engine
+from sqlmodel import Session
 from tests.fixtures.messages import ALL_FIXTURES
 
 from tagsmith.config import Settings
-from tagsmith.db.session import reset_engine
+from tagsmith.db import models as _models  # noqa: F401
+from tagsmith.db.session import init_db, reset_engine
 from tagsmith.gmail.fake import FakeGmail
+from tagsmith.rag.store import RagExample  # noqa: F401
 from tagsmith.taxonomy.registry import TaxonomyRegistry
 
 
@@ -27,17 +29,16 @@ def settings(tmp_path: Path) -> Settings:
         llm_model="test",
         body_char_limit=2000,
         log_level="WARNING",
+        enable_background_sync=False,
+        session_signing_key="test-session-secret",
+        token_encryption_key="test-token-secret",
     )
 
 
 @pytest.fixture()
 def session(settings: Settings) -> Iterator[Session]:
     reset_engine()
-    engine = create_engine(
-        settings.database_url,
-        connect_args={"check_same_thread": False},
-    )
-    SQLModel.metadata.create_all(engine)
+    engine = init_db(settings)
     with Session(engine) as sess:
         TaxonomyRegistry(sess, settings).ensure_seeded()
         yield sess

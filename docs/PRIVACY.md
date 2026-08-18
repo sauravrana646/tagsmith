@@ -26,7 +26,7 @@ When a message misses the rule engine and hits the LLM, Tagsmith sends:
 
 Raw MIME, full HTML, and attachment contents are not uploaded by Tagsmith.
 
-Provider retention policies are **outside** Tagsmith’s control — prefer providers with zero-retention options for production/SaaS (Phase 5).
+Provider retention policies are **outside** Tagsmith’s control — prefer providers with zero-retention options.
 
 ## What is stored locally
 
@@ -55,6 +55,8 @@ OAuth consent screen app name must remain **Tagsmith**. Google rejects names tha
 | Token compromised | Revoke app access in Google Account settings; delete local `token.json`; re-`auth` |
 | Bad new category approved | Mark rejected in taxonomy / delete Gmail label; stop using key |
 
-## Future SaaS (Phase 5) expectations
+## Future SaaS (Phase 6)
 
-Not implemented yet. Plan calls for encrypted per-tenant refresh tokens, hash/embedding-first storage, published data policy, and Google sensitive-scope verification. See [PLAN.md](PLAN.md).
+**This is the customer product.** Hosted web app; we process truncated mail on
+our servers. Hard rules above still apply, plus retention/TTL in
+[PHASE6.md](PHASE6.md). Local CLI is operator-only.

@@ -35,9 +35,14 @@ Pull requests targeting `main` run `.github/workflows/ci.yml` (no push-to-`main`
 | Job | What it checks |
 | --- | --- |
 | `secret-scan` | Gitleaks + credential filename guard (runs first) |
-| `lint-test` | Ruff, Mypy, Pytest (3.11 / 3.12) |
-| `security` | pip-audit + Bandit |
+| `lint-test` | Validate CLI/seed files, Ruff, Mypy, Pytest (3.11 / 3.12) |
+| `web-validate` | `tsc --noEmit` for `web/` (skipped if no dashboard) |
+| `security` | pip-audit (dependency CVEs) + Bandit (SAST); JSON artifacts |
 | `quality-gate` | Aggregates the above; **this** is the merge gate |
+| `pr-report` | Posts / updates a checklist comment on the PR |
+| `auto-merge` | Squash-merges to `main` when `quality-gate` is green **and** the PR is **not a draft** |
+
+Draft PRs still get full CI + the report comment, but will **not** auto-merge until you click **Ready for review**.
 
 ### Secret detection: Gitleaks vs GitGuardian
 

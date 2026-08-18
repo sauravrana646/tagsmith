@@ -2,9 +2,8 @@
 title = "tagsmith"
 
 [allowlist]
-description = "Allow benign example/docs placeholders"
+description = "Allow benign example placeholders (not the whole docs tree)"
 paths = [
   '''^\.env\.example$''',
-  '''^docs/.*''',
   '''^README\.md$''',
 ]

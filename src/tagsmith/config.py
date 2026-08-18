@@ -64,6 +64,38 @@ class Settings(BaseSettings):
     rag_category_k: int = 3
     rag_embedding_dim: int = 256
 
+    # Phase 4 — continuous operation / Pub/Sub watch
+    pubsub_topic: str | None = None
+    schedule_interval_seconds: int = 300
+    watch_renew_hours: int = 24 * 6  # renew before the ~7-day Gmail watch expiry
+    # In-process loop when `tagsmith api` starts (sync + RAG catch-up).
+    enable_background_sync: bool = True
+    # Background ticks write Gmail labels only when true (default dry-run, like CLI schedule).
+    background_sync_apply: bool = False
+
+    # Phase 5 — API / multi-tenant
+    api_host: str = "127.0.0.1"
+    api_port: int = 8080
+    api_public_base_url: str = "http://127.0.0.1:8080"
+    # Where OAuth should send the browser after login (Next.js dashboard).
+    web_app_url: str = "http://127.0.0.1:3000"
+    # Fernet key material (any passphrase; hashed to 32 bytes). Required for tenant tokens.
+    token_encryption_key: str = ""
+    # Web OAuth client (can reuse desktop JSON; prefer a Web application client).
+    google_web_client_id: str = ""
+    google_web_client_secret: str = ""
+    google_oauth_redirect_path: str = "/auth/callback"
+    # Optional Stripe (billing hooks; checkout not required for local single-user).
+    stripe_api_key: str = ""
+    stripe_webhook_secret: str = ""
+    session_signing_key: str = ""
+    # OpenAPI /docs and ReDoc (off by default).
+    enable_api_docs: bool = False
+    enable_auth_debug: bool = False
+    cookie_secure: bool = False
+    # Daily cap for POST /api/sync/run per tenant when plan limits are absent.
+    default_sync_per_day: int = 50
+
     @property
     def needs_review_label_name(self) -> str:
         return f"{self.label_parent}/{self.needs_review_label}"

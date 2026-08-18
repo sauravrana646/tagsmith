@@ -28,3 +28,31 @@ def test_format_message_for_review_includes_headers() -> None:
     assert "Subject: More access" in text
     assert "List-Unsubscribe: yes" in text
     assert "Do more with ChatGPT" in text
+
+
+def test_list_needs_review_uses_constant_queries(session, settings) -> None:
+    from tagsmith.db.models import ClassificationRecord, ClassificationSource, Message, MessageState
+    from tagsmith.review.queue import ReviewService
+
+    for i in range(5):
+        session.add(
+            Message(
+                gmail_id=f"nr-{i}",
+                thread_id=f"t-{i}",
+                sender="a@b.com",
+                subject=f"s{i}",
+                state=MessageState.NEEDS_REVIEW,
+            )
+        )
+        session.add(
+            ClassificationRecord(
+                gmail_id=f"nr-{i}",
+                label_key="promotion",
+                predicted_key="promotion",
+                source=ClassificationSource.LLM,
+                needs_review=True,
+            )
+        )
+    session.commit()
+    rows = ReviewService(session).list_needs_review()
+    assert len(rows) == 5
