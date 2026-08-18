@@ -4,17 +4,24 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlmodel import Session
 
-from tagsmith.api.deps import gmail_dep, session_dep, settings_dep
+from tagsmith.api.deps import gmail_dep, require_session, session_dep, settings_dep
+from tagsmith.api.rate_limit import check_sync_rate
 from tagsmith.config import Settings
+from tagsmith.db.models import Tenant
 from tagsmith.gmail.client import GmailClient
 from tagsmith.services.sync import SyncService
+from tagsmith.services.sync_lock import SyncInProgress, sync_flight
 from tagsmith.services.watch_ops import WatchOps
 
-router = APIRouter(prefix="/api/sync", tags=["sync"])
+router = APIRouter(
+    prefix="/api/sync",
+    tags=["sync"],
+    dependencies=[Depends(require_session)],
+)
 
 
 class SyncBody(BaseModel):
@@ -30,20 +37,29 @@ async def run_sync(
     session: Session = Depends(session_dep),
     settings: Settings = Depends(settings_dep),
     gmail: GmailClient = Depends(gmail_dep),
+    tenant: Tenant = Depends(require_session),
 ) -> dict[str, Any]:
-    service = SyncService(session, gmail, settings)
-    if body.incremental:
-        result = await service.sync_incremental(
-            limit=body.limit,
-            apply=body.apply,
-            reprocess=body.reprocess,
-        )
-    else:
-        result = await service.sync(
-            limit=body.limit,
-            apply=body.apply,
-            reprocess=body.reprocess,
-        )
+    tenant_id = tenant.id or 1
+    daily = 2000 if tenant.plan == "pro" else settings.default_sync_per_day
+    if not check_sync_rate(tenant_id, limit_per_day=daily):
+        raise HTTPException(status_code=429, detail="rate limit exceeded")
+    service = SyncService(session, gmail, settings, tenant_id=tenant_id)
+    try:
+        with sync_flight(blocking=False):
+            if body.incremental:
+                result = await service.sync_incremental(
+                    limit=body.limit,
+                    apply=body.apply,
+                    reprocess=body.reprocess,
+                )
+            else:
+                result = await service.sync(
+                    limit=body.limit,
+                    apply=body.apply,
+                    reprocess=body.reprocess,
+                )
+    except SyncInProgress as exc:
+        raise HTTPException(status_code=409, detail="already_running") from exc
     return {
         "run_id": result.run_id,
         "dry_run": result.dry_run,
@@ -90,5 +106,10 @@ def watch_renew(
     settings: Settings = Depends(settings_dep),
     gmail: GmailClient = Depends(gmail_dep),
 ) -> dict[str, Any]:
-    topic = body.topic if body else None
+    configured = settings.pubsub_topic
+    if body and body.topic and configured and body.topic != configured:
+        raise HTTPException(status_code=400, detail="topic does not match configured pubsub_topic")
+    topic = configured
+    if not topic:
+        raise HTTPException(status_code=400, detail="TAGSMITH_PUBSUB_TOPIC is not configured")
     return WatchOps(session, gmail, settings).start_or_renew(topic_name=topic).as_dict()

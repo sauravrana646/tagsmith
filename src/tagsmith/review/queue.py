@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from datetime import UTC, datetime
 
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, col, select
 
 from tagsmith.db.models import (
@@ -17,6 +18,7 @@ from tagsmith.db.models import (
     ProposalStatus,
     ReviewStatus,
 )
+from tagsmith.db.session import LOCAL_TENANT_ID
 from tagsmith.telemetry import get_logger
 
 log = get_logger(__name__)
@@ -33,13 +35,15 @@ def proposal_dedupe_key(suggested_key: str, description: str) -> str:
 
 
 class ReviewService:
-    def __init__(self, session: Session) -> None:
+    def __init__(self, session: Session, *, tenant_id: int = LOCAL_TENANT_ID) -> None:
         self.session = session
+        self.tenant_id = tenant_id
 
     def list_pending_proposals(self) -> list[Proposal]:
         stmt = (
             select(Proposal)
             .where(Proposal.status == ProposalStatus.PENDING)
+            .where(Proposal.tenant_id == self.tenant_id)
             .order_by(col(Proposal.created_at))
         )
         return list(self.session.exec(stmt).all())
@@ -49,23 +53,34 @@ class ReviewService:
             self.session.exec(
                 select(Message)
                 .where(Message.state == MessageState.NEEDS_REVIEW)
+                .where(Message.tenant_id == self.tenant_id)
                 .order_by(col(Message.received_at))
             ).all()
         )
-        out: list[tuple[Message, ClassificationRecord]] = []
-        for message in messages:
-            record = self.session.exec(
+        if not messages:
+            return []
+        ids = [m.gmail_id for m in messages]
+        records = list(
+            self.session.exec(
                 select(ClassificationRecord)
-                .where(ClassificationRecord.gmail_id == message.gmail_id)
+                .where(ClassificationRecord.gmail_id.in_(ids))  # type: ignore[attr-defined]
                 .where(ClassificationRecord.needs_review == True)  # noqa: E712
                 .where(
                     (ClassificationRecord.review_status == ReviewStatus.PENDING)
                     | (ClassificationRecord.review_status == None)  # noqa: E711
                 )
                 .order_by(col(ClassificationRecord.created_at).desc())
-            ).first()
-            if record is not None:
-                out.append((message, record))
+            ).all()
+        )
+        latest: dict[str, ClassificationRecord] = {}
+        for record in records:
+            if record.gmail_id not in latest:
+                latest[record.gmail_id] = record
+        out: list[tuple[Message, ClassificationRecord]] = []
+        for message in messages:
+            found = latest.get(message.gmail_id)
+            if found is not None:
+                out.append((message, found))
         return out
 
     def list_held(self) -> list[tuple[Message, ClassificationRecord | None]]:
@@ -79,18 +94,25 @@ class ReviewService:
             self.session.exec(
                 select(Message)
                 .where(Message.state == MessageState.HELD)
+                .where(Message.tenant_id == self.tenant_id)
                 .order_by(col(Message.received_at))
             ).all()
         )
-        out: list[tuple[Message, ClassificationRecord | None]] = []
-        for message in messages:
-            record = self.session.exec(
+        if not messages:
+            return []
+        ids = [m.gmail_id for m in messages]
+        records = list(
+            self.session.exec(
                 select(ClassificationRecord)
-                .where(ClassificationRecord.gmail_id == message.gmail_id)
+                .where(ClassificationRecord.gmail_id.in_(ids))  # type: ignore[attr-defined]
                 .order_by(col(ClassificationRecord.created_at).desc())
-            ).first()
-            out.append((message, record))
-        return out
+            ).all()
+        )
+        latest: dict[str, ClassificationRecord] = {}
+        for record in records:
+            if record.gmail_id not in latest:
+                latest[record.gmail_id] = record
+        return [(message, latest.get(message.gmail_id)) for message in messages]
 
     def enqueue_proposal(
         self,
@@ -117,7 +139,6 @@ class ReviewService:
             )
             return None
 
-        # Also mark category as proposed if absent.
         cat = self.session.get(Category, suggested_key)
         if cat is None:
             self.session.add(
@@ -137,9 +158,15 @@ class ReviewService:
             why_no_existing_fit=why_no_existing_fit,
             status=ProposalStatus.PENDING,
             dedupe_key=dedupe,
+            tenant_id=self.tenant_id,
         )
         self.session.add(proposal)
-        self.session.commit()
+        try:
+            self.session.commit()
+        except IntegrityError:
+            self.session.rollback()
+            log.info("proposal.deduped_integrity", gmail_id=gmail_id, suggested_key=suggested_key)
+            return None
         self.session.refresh(proposal)
         return proposal
 

@@ -16,13 +16,17 @@ from tenacity import (
 
 from tagsmith.config import Settings
 from tagsmith.gmail.auth import get_credentials
+from tagsmith.gmail.errors import GmailApiError
 from tagsmith.gmail.parser import NormalizedEmail, normalize_message
+from tagsmith.gmail.protocol import HistoryPage
 from tagsmith.telemetry import get_logger
 
 log = get_logger(__name__)
 
 
 def _is_retryable(exc: BaseException) -> bool:
+    if isinstance(exc, GmailApiError):
+        return exc.status == 429 or exc.status >= 500
     if not isinstance(exc, HttpError):
         return False
     status = int(exc.resp.status) if exc.resp is not None else 0
@@ -50,7 +54,11 @@ class GmailClient:
         reraise=True,
     )
     def _execute(self, request: Any) -> Any:
-        return request.execute()
+        try:
+            return request.execute()
+        except HttpError as exc:
+            status = int(exc.resp.status) if exc.resp is not None else 0
+            raise GmailApiError(status, str(exc)) from exc
 
     def list_labels(self) -> list[dict[str, Any]]:
         result = cast(
@@ -167,12 +175,18 @@ class GmailClient:
         *,
         start_history_id: str,
         max_results: int = 100,
-    ) -> tuple[list[str], str | None]:
-        """Page users.history.list and collect unique message ids that changed."""
+    ) -> HistoryPage:
+        """Page users.history.list and collect unique message ids that changed.
+
+        The returned cursor is the last consumed history **entry** id. Mailbox-head
+        ``historyId`` is never used when the page stream is truncated (C-2).
+        """
         ids: list[str] = []
         seen: set[str] = set()
         page_token: str | None = None
         latest: str | None = None
+        truncated = False
+        mailbox_head: str | None = None
         while True:
             result = cast(
                 dict[str, Any],
@@ -184,25 +198,51 @@ class GmailClient:
                         startHistoryId=start_history_id,
                         maxResults=min(100, max_results),
                         pageToken=page_token,
-                        historyTypes=["messageAdded", "labelAdded", "labelRemoved"],
+                        historyTypes=[
+                            "messageAdded",
+                            "messageDeleted",
+                            "labelAdded",
+                            "labelRemoved",
+                        ],
                     )
                 ),
             )
+            if result.get("historyId") is not None:
+                mailbox_head = str(result["historyId"])
             for entry in result.get("history") or []:
-                latest = str(entry.get("id") or latest or "")
+                entry_ids: list[str] = []
                 for key in ("messagesAdded", "messagesDeleted", "labelsAdded", "labelsRemoved"):
                     for item in entry.get(key) or []:
                         msg = item.get("message") or {}
                         mid = msg.get("id")
-                        if mid and mid not in seen:
-                            seen.add(str(mid))
-                            ids.append(str(mid))
-            if result.get("historyId") is not None:
-                latest = str(result["historyId"])
+                        if mid:
+                            entry_ids.append(str(mid))
+                incoming = [mid for mid in entry_ids if mid not in seen]
+                if incoming and len(ids) + len(incoming) > max_results and ids:
+                    truncated = True
+                    break
+                entry_id = str(entry.get("id") or "") or None
+                if entry_id:
+                    latest = entry_id
+                for mid in incoming:
+                    seen.add(mid)
+                    ids.append(mid)
+                    if len(ids) >= max_results:
+                        truncated = True
+                        break
+                if truncated:
+                    break
             page_token = result.get("nextPageToken")
-            if not page_token or len(ids) >= max_results:
+            if truncated:
                 break
-        return ids[:max_results], latest
+            if not page_token:
+                if latest is None:
+                    latest = mailbox_head
+                break
+            if len(ids) >= max_results:
+                truncated = True
+                break
+        return HistoryPage(ids[:max_results], latest, truncated)
 
     def watch_mailbox(
         self,

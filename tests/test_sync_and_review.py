@@ -32,7 +32,8 @@ async def test_sync_dry_run_rules_path(session, settings: Settings, fake_gmail) 
     assert fake_gmail.modify_calls == []
     msg = session.get(Message, "msg_payment_1")
     assert msg is not None
-    assert msg.state == MessageState.LABELED
+    assert msg.state == MessageState.PENDING
+    assert msg.applied_label_id is None
     record = session.exec(select(ClassificationRecord)).first()
     assert record is not None
     assert record.source == ClassificationSource.RULE
@@ -42,8 +43,8 @@ async def test_sync_dry_run_rules_path(session, settings: Settings, fake_gmail) 
 
     assert make_store(session, settings).count() == 0
     caught = catchup_from_db(session, settings)
-    assert caught.indexed == 1
-    assert make_store(session, settings).count() == 1
+    assert caught.indexed == 0
+    assert make_store(session, settings).count() == 0
 
 
 @pytest.mark.asyncio
@@ -55,6 +56,26 @@ async def test_sync_apply_and_skip_prior(session, settings: Settings, fake_gmail
     assert fake_gmail.modify_calls
     second = await service.sync(limit=10, apply=True)
     assert second.counts.skipped_prior == 1
+
+
+@pytest.mark.asyncio
+async def test_dry_run_then_apply_does_not_skip_prior(
+    session, settings: Settings, fake_gmail
+) -> None:
+    fake_gmail.messages = {"msg_payment_1": dict(PAYMENT_ALERT)}
+    service = SyncService(session, fake_gmail, settings)
+    dry = await service.sync(limit=10, apply=False)
+    assert dry.counts.skipped_prior == 0
+    msg = session.get(Message, "msg_payment_1")
+    assert msg is not None
+    assert msg.state == MessageState.PENDING
+    applied = await service.sync(limit=10, apply=True)
+    assert applied.counts.skipped_prior == 0
+    assert applied.counts.applied >= 1
+    msg = session.get(Message, "msg_payment_1")
+    assert msg is not None
+    assert msg.state == MessageState.LABELED
+    assert fake_gmail.modify_calls
 
 
 @pytest.mark.asyncio
@@ -276,3 +297,195 @@ async def test_assign_existing_label_closes_proposal(
     assert msg.applied_label_key == "promotion"
     assert msg.applied_label_id is not None
     assert any(msg.applied_label_id in call["add"] for call in fake_gmail.modify_calls)
+
+
+@pytest.mark.asyncio
+async def test_confirm_label_removes_needs_review(session, settings: Settings, fake_gmail) -> None:
+    from tagsmith.classify import pipeline as pipeline_mod
+
+    async def fake_classify(email, **kwargs):  # type: ignore[no-untyped-def]
+        return Classification(
+            label_key="promotion",
+            confidence=0.62,
+            rationale="Sales language.",
+        )
+
+    pipeline_mod.classify_email = fake_classify  # type: ignore[assignment]
+    fake_gmail.messages = {"msg_html_1": dict(HTML_ONLY)}
+    await SyncService(session, fake_gmail, settings).sync(limit=5, apply=True)
+    review_id = fake_gmail.get_or_create_label(settings.needs_review_label_name)["id"]
+    ops = ReviewOps(session, fake_gmail, settings)
+    ops.confirm_label("msg_html_1", apply=True)
+    assert any(review_id in call["remove"] for call in fake_gmail.modify_calls)
+
+
+@pytest.mark.asyncio
+async def test_change_label_removes_needs_review(session, settings: Settings, fake_gmail) -> None:
+    from tagsmith.classify import pipeline as pipeline_mod
+
+    async def fake_classify(email, **kwargs):  # type: ignore[no-untyped-def]
+        return Classification(
+            label_key="promotion",
+            confidence=0.62,
+            rationale="Sales language.",
+        )
+
+    pipeline_mod.classify_email = fake_classify  # type: ignore[assignment]
+    fake_gmail.messages = {"msg_html_1": dict(HTML_ONLY)}
+    await SyncService(session, fake_gmail, settings).sync(limit=5, apply=True)
+    review_id = fake_gmail.get_or_create_label(settings.needs_review_label_name)["id"]
+    ops = ReviewOps(session, fake_gmail, settings)
+    ops.change_label("msg_html_1", "newsletter", apply=True)
+    assert any(review_id in call["remove"] for call in fake_gmail.modify_calls)
+
+
+@pytest.mark.asyncio
+async def test_approve_proposal_removes_needs_review(
+    session, settings: Settings, fake_gmail
+) -> None:
+    from tagsmith.classify import pipeline as pipeline_mod
+
+    async def propose_new(email, **kwargs):  # type: ignore[no-untyped-def]
+        return Classification(
+            label_key=None,
+            confidence=0.2,
+            rationale="no fit",
+            proposed_new=NewCategory(
+                suggested_key="insurance-renewal",
+                description="Policy renewal",
+                why_no_existing_fit="not saas",
+            ),
+        )
+
+    pipeline_mod.classify_email = propose_new  # type: ignore[assignment]
+    fake_gmail.messages = {"msg_html_1": dict(HTML_ONLY)}
+    await SyncService(session, fake_gmail, settings).sync(limit=5, apply=True)
+    review_id = fake_gmail.get_or_create_label(settings.needs_review_label_name)["id"]
+    ops = ReviewOps(session, fake_gmail, settings)
+    proposal_id = ops.list_proposals()[0].proposal.id or 0
+    await ops.approve_proposal(proposal_id, apply=True)
+    assert any(review_id in call["remove"] for call in fake_gmail.modify_calls)
+
+
+@pytest.mark.asyncio
+async def test_approve_proposal_reclassifies_only_matching_held(
+    session, settings: Settings, fake_gmail
+) -> None:
+    from tagsmith.classify import pipeline as pipeline_mod
+    from tagsmith.db.models import Message as Msg
+    from tagsmith.review.queue import ReviewService
+
+    async def propose_a(email, **kwargs):  # type: ignore[no-untyped-def]
+        return Classification(
+            label_key=None,
+            confidence=0.2,
+            rationale="a",
+            proposed_new=NewCategory(
+                suggested_key="cat-alpha",
+                description="Alpha mail",
+                why_no_existing_fit="a",
+            ),
+        )
+
+    pipeline_mod.classify_email = propose_a  # type: ignore[assignment]
+    fake_gmail.messages = {"msg_html_1": dict(HTML_ONLY)}
+    await SyncService(session, fake_gmail, settings).sync(limit=5, apply=True)
+
+    other = dict(HTML_ONLY)
+    other["id"] = "msg_html_2"
+    fake_gmail.messages["msg_html_2"] = other
+    session.add(
+        Msg(
+            gmail_id="msg_html_2",
+            thread_id="t2",
+            sender="x@y.com",
+            subject="other",
+            state=MessageState.HELD,
+        )
+    )
+    ReviewService(session).enqueue_proposal(
+        gmail_id="msg_html_2",
+        suggested_key="cat-beta",
+        description="Beta mail extra words here",
+        rationale="b",
+        why_no_existing_fit="b",
+    )
+    session.commit()
+
+    ops = ReviewOps(session, fake_gmail, settings)
+    match = next(p for p in ops.list_proposals() if p.proposal.gmail_id == "msg_html_1")
+    await ops.approve_proposal(match.proposal.id or 0, apply=True)
+    leftover = session.get(Msg, "msg_html_2")
+    assert leftover is not None
+    assert leftover.state == MessageState.HELD
+
+
+@pytest.mark.asyncio
+async def test_process_email_retries_after_commit_failure_does_not_reclassify(
+    session, settings: Settings, fake_gmail
+) -> None:
+    from tagsmith.classify import pipeline as pipeline_mod
+
+    calls = {"n": 0}
+
+    async def fake_classify(email, **kwargs):  # type: ignore[no-untyped-def]
+        calls["n"] += 1
+        return Classification(
+            label_key="promotion",
+            confidence=0.95,
+            rationale="promo",
+        )
+
+    pipeline_mod.classify_email = fake_classify  # type: ignore[assignment]
+    fake_gmail.messages = {"msg_html_1": dict(HTML_ONLY)}
+    service = SyncService(session, fake_gmail, settings)
+    await service.sync(limit=5, apply=False)
+    assert calls["n"] == 1
+    await service.sync(limit=5, apply=True)
+    assert calls["n"] == 1
+    msg = session.get(Message, "msg_html_1")
+    assert msg is not None
+    assert msg.state == MessageState.LABELED
+
+
+@pytest.mark.asyncio
+async def test_full_sync_skips_missing_message_and_finalizes_run(
+    session, settings: Settings, fake_gmail
+) -> None:
+    from tagsmith.db.models import Run
+
+    fake_gmail.messages = {
+        "msg_payment_1": dict(PAYMENT_ALERT),
+        "gone": dict(PAYMENT_ALERT),
+    }
+    fake_gmail.messages["gone"]["id"] = "gone"
+    fake_gmail.get_message_errors["gone"] = KeyError("gone")
+    service = SyncService(session, fake_gmail, settings)
+    result = await service.sync(limit=10, apply=False)
+    assert result.run_id is not None
+    run = session.get(Run, result.run_id)
+    assert run is not None
+    assert run.finished_at is not None
+
+
+@pytest.mark.asyncio
+async def test_concurrent_enqueue_same_dedupe_key_does_not_raise(session) -> None:
+    from tagsmith.review.queue import ReviewService
+
+    queue = ReviewService(session)
+    first = queue.enqueue_proposal(
+        gmail_id="m1",
+        suggested_key="dup-key",
+        description="same description tokens here extra",
+        rationale="r",
+        why_no_existing_fit="w",
+    )
+    second = queue.enqueue_proposal(
+        gmail_id="m2",
+        suggested_key="dup-key",
+        description="same description tokens here extra",
+        rationale="r",
+        why_no_existing_fit="w",
+    )
+    assert first is not None
+    assert second is None

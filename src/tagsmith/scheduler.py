@@ -13,6 +13,7 @@ from tagsmith.db.models import utcnow
 from tagsmith.gmail.protocol import GmailGateway
 from tagsmith.rag.index import RagCatchupResult, catchup_from_db
 from tagsmith.services.sync import SyncResult, SyncService
+from tagsmith.services.sync_lock import SyncInProgress, sync_flight
 from tagsmith.services.watch_ops import WatchOps, WatchStatus
 from tagsmith.telemetry import get_logger
 
@@ -52,6 +53,32 @@ async def run_schedule_tick(
     limit: int = 100,
 ) -> ScheduleTickResult:
     """One scheduler cycle: optional incremental sync, watch renew, RAG catch-up."""
+    try:
+        with sync_flight(blocking=False):
+            return await _run_schedule_tick_unlocked(
+                session,
+                gmail,
+                settings,
+                apply=apply,
+                renew_watch=renew_watch,
+                incremental=incremental,
+                limit=limit,
+            )
+    except SyncInProgress:
+        log.info("sync.skipped_lock")
+        return ScheduleTickResult(sync=None, watch=None, rag=None, errors=["already_running"])
+
+
+async def _run_schedule_tick_unlocked(
+    session: Session,
+    gmail: GmailGateway | None,
+    settings: Settings,
+    *,
+    apply: bool,
+    renew_watch: bool,
+    incremental: bool,
+    limit: int,
+) -> ScheduleTickResult:
     errors: list[str] = []
     sync_result: SyncResult | None = None
     watch_status: WatchStatus | None = None

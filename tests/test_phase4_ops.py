@@ -97,6 +97,7 @@ async def test_schedule_tick_catchup_without_gmail(
             subject="OTP 123",
             state=MessageState.LABELED,
             applied_label_key="otp-verification",
+            applied_label_id="L-otp",
             payload_json={"sender": "a@b.com", "subject": "OTP 123", "body_text": "code"},
         )
     )
@@ -108,3 +109,112 @@ async def test_schedule_tick_catchup_without_gmail(
     assert tick.rag.indexed == 1
     assert tick.errors == []
     assert make_store(session, settings).count() == 1
+
+
+@pytest.mark.asyncio
+async def test_list_history_truncated_does_not_jump_to_mailbox_head(
+    session: Session,
+    settings: Settings,
+) -> None:
+    gmail = FakeGmail(messages=[PAYMENT_ALERT, SECURITY_ALERT])
+    gmail.history_id = "999"
+    gmail.history_chain = [(str(i), f"m{i}") for i in range(11, 161)]
+    for i in range(11, 161):
+        raw = dict(PAYMENT_ALERT)
+        raw["id"] = f"m{i}"
+        gmail.messages[f"m{i}"] = raw
+    service = SyncService(session, gmail, settings)
+    state = service.ensure_history_cursor()
+    state.history_id = "10"
+    session.commit()
+    result = await service.sync_incremental(limit=100, apply=False)
+    assert result.counts.fetched == 100
+    refreshed = session.get(SyncState, 1)
+    assert refreshed is not None
+    assert refreshed.history_id == "110"
+    assert refreshed.history_id != gmail.history_id
+
+
+@pytest.mark.asyncio
+async def test_sync_incremental_second_page_after_limit(
+    session: Session,
+    settings: Settings,
+) -> None:
+    gmail = FakeGmail()
+    gmail.history_chain = [(str(i), f"m{i}") for i in range(11, 31)]
+    for i in range(11, 31):
+        raw = dict(PAYMENT_ALERT)
+        raw["id"] = f"m{i}"
+        gmail.messages[f"m{i}"] = raw
+    service = SyncService(session, gmail, settings)
+    state = service.ensure_history_cursor()
+    state.history_id = "10"
+    session.commit()
+    first = await service.sync_incremental(limit=10, apply=False)
+    assert first.counts.fetched == 10
+    second = await service.sync_incremental(limit=10, apply=False)
+    assert second.counts.fetched == 10
+    refreshed = session.get(SyncState, 1)
+    assert refreshed is not None
+    assert refreshed.history_id == "30"
+
+
+def test_watch_renew_does_not_overwrite_existing_history_id(
+    session: Session, settings: Settings
+) -> None:
+    settings = settings.model_copy(update={"pubsub_topic": "projects/demo/topics/tagsmith"})
+    gmail = FakeGmail()
+    gmail.history_id = "99"
+    ops = WatchOps(session, gmail, settings)
+    state = ops._state()
+    state.history_id = "5"
+    session.commit()
+    status = ops.start_or_renew()
+    assert status.history_id == "5"
+
+
+def test_watch_bootstrap_sets_history_id_when_unset(session: Session, settings: Settings) -> None:
+    settings = settings.model_copy(update={"pubsub_topic": "projects/demo/topics/tagsmith"})
+    gmail = FakeGmail()
+    gmail.history_id = "42"
+    ops = WatchOps(session, gmail, settings)
+    status = ops.start_or_renew()
+    assert status.history_id == "42"
+
+
+@pytest.mark.asyncio
+async def test_incremental_404_falls_back_to_full(session: Session, settings: Settings) -> None:
+    from tagsmith.gmail.errors import GmailApiError
+
+    gmail = FakeGmail(messages=[PAYMENT_ALERT])
+    gmail.list_history_error = GmailApiError(404, "stale")
+    service = SyncService(session, gmail, settings)
+    service.ensure_history_cursor()
+    result = await service.sync_incremental(limit=10, apply=False)
+    assert result.counts.fetched >= 1
+    assert result.dry_run is True
+
+
+@pytest.mark.asyncio
+async def test_incremental_503_does_not_fallback(session: Session, settings: Settings) -> None:
+    from tagsmith.gmail.errors import GmailApiError
+
+    gmail = FakeGmail(messages=[PAYMENT_ALERT])
+    gmail.list_history_error = GmailApiError(503, "unavailable")
+    service = SyncService(session, gmail, settings)
+    service.ensure_history_cursor()
+    with pytest.raises(GmailApiError):
+        await service.sync_incremental(limit=10, apply=False)
+
+
+def test_sqlite_wal_pragma_enabled(settings: Settings) -> None:
+    from sqlalchemy import text
+
+    from tagsmith.db.session import init_db, reset_engine
+
+    reset_engine()
+    engine = init_db(settings)
+    with engine.connect() as conn:
+        mode = conn.execute(text("PRAGMA journal_mode")).scalar()
+    reset_engine()
+    assert str(mode).lower() == "wal"

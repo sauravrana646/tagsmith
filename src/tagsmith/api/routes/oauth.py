@@ -2,12 +2,21 @@
 
 from __future__ import annotations
 
+import hmac
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlmodel import Session, select
 
+from tagsmith.api.auth.session import (
+    SESSION_COOKIE,
+    SESSION_MAX_AGE,
+    SessionError,
+    sign_session_value,
+    signing_key,
+    verify_session_value,
+)
 from tagsmith.api.auth.web_oauth import (
     encrypt_refresh_token,
     exchange_code,
@@ -15,40 +24,43 @@ from tagsmith.api.auth.web_oauth import (
     make_authorize_url,
     oauth_debug_info,
 )
-from tagsmith.api.deps import session_dep, settings_dep
+from tagsmith.api.deps import safe_web_app_url, session_dep, settings_dep
 from tagsmith.config import Settings
 from tagsmith.db.models import Tenant, utcnow
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-_SESSION_COOKIE = "tagsmith_tenant"
-_SESSION_MAX_AGE = 60 * 60 * 24 * 30
 
-
-def _set_session_cookie(response: Response, tenant_id: int) -> None:
-    # HttpOnly + SameSite=Lax: JS cannot read; CSRF-resistant for top-level nav.
-    # Secure is omitted for local http://127.0.0.1 development.
+def _set_session_cookie(
+    response: Response, tenant_id: int, settings: Settings, *, request: Request | None = None
+) -> None:
+    secret = signing_key(settings)
+    value = sign_session_value(tenant_id, secret)
+    secure = settings.cookie_secure
+    if request is not None and request.url.scheme == "https":
+        secure = True
     response.set_cookie(
-        key=_SESSION_COOKIE,
-        value=str(tenant_id),
+        key=SESSION_COOKIE,
+        value=value,
         httponly=True,
         samesite="lax",
-        max_age=_SESSION_MAX_AGE,
+        secure=secure,
+        max_age=SESSION_MAX_AGE,
         path="/",
     )
 
 
 def _clear_session_cookie(response: Response) -> None:
-    response.delete_cookie(_SESSION_COOKIE, path="/")
+    response.delete_cookie(SESSION_COOKIE, path="/")
 
 
-def _tenant_from_request(request: Request, session: Session) -> Tenant | None:
-    raw = request.cookies.get(_SESSION_COOKIE) or getattr(request.state, "tenant_id", None)
+def _tenant_from_request(request: Request, session: Session, settings: Settings) -> Tenant | None:
+    raw = request.cookies.get(SESSION_COOKIE)
     if not raw:
         return None
     try:
-        tenant_id = int(raw)
-    except (TypeError, ValueError):
+        tenant_id = verify_session_value(raw, signing_key(settings))
+    except SessionError:
         return None
     return session.get(Tenant, tenant_id)
 
@@ -69,7 +81,9 @@ def _me_payload(tenant: Tenant | None) -> dict[str, Any]:
 
 @router.get("/debug")
 def auth_debug(settings: Settings = Depends(settings_dep)) -> dict[str, Any]:
-    """Print OAuth config checklist (no secrets). Open this if Google hangs."""
+    """Print OAuth config checklist (no secrets). Disabled unless explicitly enabled."""
+    if not settings.enable_auth_debug:
+        raise HTTPException(404, "Not Found")
     return oauth_debug_info(settings)
 
 
@@ -82,19 +96,19 @@ def login(
     force: bool = Query(False, description="Force Google account picker even if signed in"),
 ) -> RedirectResponse | HTMLResponse:
     """Start Google OAuth, or bounce home if a valid session cookie already exists."""
-    existing = _tenant_from_request(request, session)
+    dest_base = safe_web_app_url(settings)
+    existing = _tenant_from_request(request, session, settings)
     if existing is not None and not force:
-        dest = settings.web_app_url.rstrip("/") + "/?auth=already"
-        return RedirectResponse(dest)
+        return RedirectResponse(dest_base + "/?auth=already")
 
     try:
         url, state = make_authorize_url(settings, prompt=prompt)
     except RuntimeError as exc:
         import html as html_lib
 
-        dash = settings.web_app_url.rstrip("/")
-        debug = settings.api_public_base_url.rstrip("/") + "/auth/debug"
+        dash = html_lib.escape(dest_base)
         safe = html_lib.escape(str(exc))
+        debug_link = "/auth/debug" if settings.enable_auth_debug else "/health"
         return HTMLResponse(
             status_code=500,
             content=f"""<!doctype html>
@@ -112,21 +126,34 @@ def login(
   <p>For local review you can keep using the dashboard with a desktop token
   (<code>uv run tagsmith auth</code>) — web Google sign-in is optional.</p>
   <a class="btn" href="{dash}">Back to dashboard</a>
-  <p><a href="{debug}">Auth debug</a></p>
+  <p><a href="{html_lib.escape(debug_link)}">Diagnostics</a></p>
 </body></html>""",
         )
     response = RedirectResponse(url)
-    response.set_cookie("oauth_state", state, httponly=True, samesite="lax", max_age=600, path="/")
+    secure = settings.cookie_secure or request.url.scheme == "https"
+    response.set_cookie(
+        "oauth_state",
+        state,
+        httponly=True,
+        samesite="lax",
+        secure=secure,
+        max_age=600,
+        path="/",
+    )
     return response
 
 
 @router.get("/callback")
 def callback(
+    request: Request,
     code: str = Query(...),
     state: str = Query(...),
     session: Session = Depends(session_dep),
     settings: Settings = Depends(settings_dep),
 ) -> RedirectResponse:
+    cookie_state = request.cookies.get("oauth_state")
+    if not cookie_state or not hmac.compare_digest(cookie_state, state):
+        raise HTTPException(400, "OAuth state mismatch")
     if not settings.token_encryption_key:
         raise HTTPException(
             500,
@@ -162,10 +189,11 @@ def callback(
     session.commit()
     session.refresh(tenant)
 
-    dest = settings.web_app_url.rstrip("/") + "/?auth=ok"
+    dest = safe_web_app_url(settings) + "/?auth=ok"
     redirect = RedirectResponse(dest)
     assert tenant.id is not None
-    _set_session_cookie(redirect, tenant.id)
+    _set_session_cookie(redirect, tenant.id, settings, request=request)
+    redirect.delete_cookie("oauth_state", path="/")
     return redirect
 
 
@@ -173,8 +201,9 @@ def callback(
 def me(
     request: Request,
     session: Session = Depends(session_dep),
+    settings: Settings = Depends(settings_dep),
 ) -> dict[str, Any]:
-    return _me_payload(_tenant_from_request(request, session))
+    return _me_payload(_tenant_from_request(request, session, settings))
 
 
 @router.post("/logout")

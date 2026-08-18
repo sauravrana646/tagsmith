@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
 from tagsmith.config import Settings
 from tagsmith.db.models import ClassificationRecord, Message, MessageState, SyncState, utcnow
@@ -101,10 +101,15 @@ def reindex_from_db(session: Session, settings: Settings) -> int:
     store = make_store(session, settings)
     store.clear()
     indexed = 0
-    messages = list(
-        session.exec(select(Message).where(Message.state == MessageState.LABELED)).all()
+    labeled = list(
+        session.exec(
+            select(Message).where(
+                Message.state == MessageState.LABELED,
+                col(Message.applied_label_id).is_not(None),
+            )
+        ).all()
     )
-    for message in messages:
+    for message in labeled:
         label = _label_for_message(session, message)
         if not label:
             continue
@@ -123,7 +128,14 @@ def catchup_from_db(session: Session, settings: Settings) -> RagCatchupResult:
     if not settings.enable_rag:
         return result
     store = make_store(session, settings)
-    labeled = list(session.exec(select(Message).where(Message.state == MessageState.LABELED)).all())
+    labeled = list(
+        session.exec(
+            select(Message).where(
+                Message.state == MessageState.LABELED,
+                col(Message.applied_label_id).is_not(None),
+            )
+        ).all()
+    )
     wanted: dict[str, tuple[Message, str]] = {}
     for message in labeled:
         label = _label_for_message(session, message)

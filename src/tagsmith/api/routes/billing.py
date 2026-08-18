@@ -9,7 +9,7 @@ from sqlmodel import Session, select
 
 from tagsmith.api.deps import session_dep, settings_dep
 from tagsmith.config import Settings
-from tagsmith.db.models import Tenant, utcnow
+from tagsmith.db.models import BillingEvent, Tenant, utcnow
 from tagsmith.telemetry import get_logger
 
 router = APIRouter(prefix="/api/billing", tags=["billing"])
@@ -63,23 +63,42 @@ async def stripe_webhook(
     except Exception as exc:
         raise HTTPException(400, f"invalid stripe signature: {exc}") from exc
 
+    event_id = str(event.get("id") or "")
+    if event_id:
+        existing = session.get(BillingEvent, event_id)
+        if existing is not None:
+            return {"status": "ok"}
+        session.add(BillingEvent(event_id=event_id))
+
     event_type = event.get("type")
     data_object = (event.get("data") or {}).get("object") or {}
+    customer_id = data_object.get("customer")
+    if isinstance(customer_id, dict):
+        customer_id = customer_id.get("id")
+    customer_id = str(customer_id or "") or None
     customer_email = data_object.get("customer_email") or data_object.get("receipt_email")
+
+    tenant = None
+    if customer_id:
+        tenant = session.exec(
+            select(Tenant).where(Tenant.stripe_customer_id == customer_id)
+        ).first()
+    if tenant is None and customer_email:
+        tenant = session.exec(select(Tenant).where(Tenant.email == customer_email)).first()
+        if tenant is not None and customer_id:
+            tenant.stripe_customer_id = customer_id
+
     if event_type in {"checkout.session.completed", "customer.subscription.updated"}:
-        plan = "pro"
-        if customer_email:
-            tenant = session.exec(select(Tenant).where(Tenant.email == customer_email)).first()
-            if tenant:
-                tenant.plan = plan
-                tenant.updated_at = utcnow()
-                session.commit()
-                log.info("billing.plan_updated", email=customer_email, plan=plan)
+        if tenant:
+            tenant.plan = "pro"
+            tenant.updated_at = utcnow()
+            session.commit()
+            log.info("billing.plan_updated", tenant_id=tenant.id, plan="pro")
     elif event_type in {"customer.subscription.deleted"}:
-        if customer_email:
-            tenant = session.exec(select(Tenant).where(Tenant.email == customer_email)).first()
-            if tenant:
-                tenant.plan = "free"
-                tenant.updated_at = utcnow()
-                session.commit()
+        if tenant:
+            tenant.plan = "free"
+            tenant.updated_at = utcnow()
+            session.commit()
+    else:
+        session.commit()
     return {"status": "ok"}

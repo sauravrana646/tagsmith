@@ -76,7 +76,7 @@ class WatchOps:
         state.watch_resource_id = str(result.get("resourceId") or "") or None
         exp = result.get("expiration")
         state.watch_expiration_ms = int(exp) if exp is not None else None
-        if result.get("historyId") is not None:
+        if result.get("historyId") is not None and state.history_id is None:
             state.history_id = str(result["historyId"])
         state.last_watch_renewed_at = utcnow()
         state.updated_at = utcnow()

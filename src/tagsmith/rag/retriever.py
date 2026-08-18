@@ -17,6 +17,9 @@ class RagContext:
     category_hints: list[str]
 
 
+_SEED_EMBED_CACHE: dict[str, list[float]] = {}
+
+
 class Retriever:
     def __init__(
         self,
@@ -55,7 +58,11 @@ class Retriever:
         scored: list[tuple[float, SeedCategory]] = []
         for cat in categories:
             blob = f"{cat.key}: {cat.description} " + " ".join(cat.exemplars)
-            scored.append((cosine_similarity(q, self.embedder.embed(blob)), cat))
+            vec = _SEED_EMBED_CACHE.get(blob)
+            if vec is None:
+                vec = self.embedder.embed(blob)
+                _SEED_EMBED_CACHE[blob] = vec
+            scored.append((cosine_similarity(q, vec), cat))
         scored.sort(key=lambda item: item[0], reverse=True)
         return [f"{cat.key}: {cat.description}" for _, cat in scored[: self.category_k]]
 

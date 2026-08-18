@@ -7,11 +7,15 @@ from typing import Any
 from fastapi import APIRouter, Depends
 from sqlmodel import Session
 
-from tagsmith.api.deps import session_dep, settings_dep
+from tagsmith.api.deps import require_session, session_dep, settings_dep
 from tagsmith.config import Settings
 from tagsmith.taxonomy.registry import TaxonomyRegistry
 
-router = APIRouter(prefix="/api/taxonomy", tags=["taxonomy"])
+router = APIRouter(
+    prefix="/api/taxonomy",
+    tags=["taxonomy"],
+    dependencies=[Depends(require_session)],
+)
 
 
 @router.get("/labels")

@@ -8,13 +8,17 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlmodel import Session
 
-from tagsmith.api.deps import gmail_dep, session_dep, settings_dep
+from tagsmith.api.deps import gmail_dep, require_session, session_dep, settings_dep
 from tagsmith.config import Settings
 from tagsmith.gmail.client import GmailClient
 from tagsmith.gmail.fake import FakeGmail
 from tagsmith.services.review_ops import ReviewOps
 
-router = APIRouter(prefix="/api/review", tags=["review"])
+router = APIRouter(
+    prefix="/api/review",
+    tags=["review"],
+    dependencies=[Depends(require_session)],
+)
 
 
 class AssignBody(BaseModel):

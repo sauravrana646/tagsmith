@@ -2,9 +2,22 @@
 
 from __future__ import annotations
 
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, NamedTuple, Protocol, runtime_checkable
 
 from tagsmith.gmail.parser import NormalizedEmail
+
+
+class HistoryPage(NamedTuple):
+    """Changed message ids plus the cursor to persist.
+
+    ``cursor`` is the last **consumed history entry id**, not the mailbox-head
+    ``historyId``. ``truncated`` is true when more history remains beyond
+    ``max_results``.
+    """
+
+    message_ids: list[str]
+    cursor: str | None
+    truncated: bool = False
 
 
 @runtime_checkable
@@ -42,8 +55,8 @@ class GmailGateway(Protocol):
         *,
         start_history_id: str,
         max_results: int = 100,
-    ) -> tuple[list[str], str | None]:
-        """Return (changed_message_ids, latest_history_id)."""
+    ) -> HistoryPage:
+        """Return changed message ids and the last consumed history cursor."""
         ...
 
     def watch_mailbox(

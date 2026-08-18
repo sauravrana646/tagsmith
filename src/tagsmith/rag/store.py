@@ -29,6 +29,7 @@ class RagExample(SQLModel, table=True):
     subject: str = ""
     body_excerpt: str = ""
     embedding: list[float] = Field(default_factory=list, sa_column=Column(JSON))
+    tenant_id: int = Field(default=1, index=True)
     created_at: datetime = Field(default_factory=utcnow)
     updated_at: datetime = Field(default_factory=utcnow)
 

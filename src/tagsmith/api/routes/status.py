@@ -7,12 +7,16 @@ from typing import Any
 from fastapi import APIRouter, Depends
 from sqlmodel import Session
 
-from tagsmith.api.deps import session_dep, settings_dep
+from tagsmith.api.deps import require_session, session_dep, settings_dep
 from tagsmith.config import Settings
 from tagsmith.gmail.auth import AuthError, get_credentials
 from tagsmith.rag.index import rag_status_payload
 
-router = APIRouter(prefix="/api/status", tags=["status"])
+router = APIRouter(
+    prefix="/api/status",
+    tags=["status"],
+    dependencies=[Depends(require_session)],
+)
 
 
 @router.get("")

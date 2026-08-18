@@ -89,6 +89,12 @@ class Settings(BaseSettings):
     stripe_api_key: str = ""
     stripe_webhook_secret: str = ""
     session_signing_key: str = ""
+    # OpenAPI /docs and ReDoc (off by default).
+    enable_api_docs: bool = False
+    enable_auth_debug: bool = False
+    cookie_secure: bool = False
+    # Daily cap for POST /api/sync/run per tenant when plan limits are absent.
+    default_sync_per_day: int = 50
 
     @property
     def needs_review_label_name(self) -> str:

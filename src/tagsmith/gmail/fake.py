@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 
+from tagsmith.gmail.errors import GmailApiError
 from tagsmith.gmail.parser import NormalizedEmail, normalize_message
+from tagsmith.gmail.protocol import HistoryPage
 
 
 class FakeGmail:
@@ -29,6 +31,10 @@ class FakeGmail:
         self.history_id = "1000"
         # Map start_history_id -> list of message ids that changed after it.
         self.history_events: dict[str, list[str]] = {}
+        # Ordered (history_entry_id, message_id) records for truncation tests.
+        self.history_chain: list[tuple[str, str]] = []
+        self.list_history_error: GmailApiError | None = None
+        self.get_message_errors: dict[str, Exception] = {}
         self.watch_calls: list[dict[str, Any]] = []
         self.stop_watch_calls = 0
 
@@ -55,6 +61,9 @@ class FakeGmail:
         return ids
 
     def get_message(self, gmail_id: str, *, format: str = "full") -> dict[str, Any]:
+        err = self.get_message_errors.get(gmail_id)
+        if err is not None:
+            raise err
         try:
             return self.messages[gmail_id]
         except KeyError as exc:
@@ -110,12 +119,37 @@ class FakeGmail:
         *,
         start_history_id: str,
         max_results: int = 100,
-    ) -> tuple[list[str], str | None]:
-        ids = list(self.history_events.get(start_history_id) or [])[:max_results]
-        # Advance cursor when events exist.
-        if ids:
-            self.history_id = str(int(self.history_id) + 1)
-        return ids, self.history_id
+    ) -> HistoryPage:
+        if self.list_history_error is not None:
+            raise self.list_history_error
+        if self.history_chain:
+            records = [
+                (hid, mid)
+                for hid, mid in self.history_chain
+                if _history_after(hid, start_history_id)
+            ]
+            truncated = len(records) > max_results
+            records = records[:max_results]
+            ids: list[str] = []
+            seen: set[str] = set()
+            latest: str | None = None
+            for hid, mid in records:
+                latest = hid
+                if mid not in seen:
+                    seen.add(mid)
+                    ids.append(mid)
+            return HistoryPage(ids, latest, truncated)
+        events = list(self.history_events.get(start_history_id) or [])
+        truncated = len(events) > max_results
+        sliced = events[:max_results]
+        if not sliced:
+            return HistoryPage([], start_history_id, False)
+        try:
+            base = int(start_history_id)
+        except ValueError:
+            base = 0
+        cursor = str(base + len(sliced))
+        return HistoryPage(sliced, cursor, truncated)
 
     def watch_mailbox(
         self,
@@ -133,3 +167,10 @@ class FakeGmail:
 
     def stop_watch(self) -> None:
         self.stop_watch_calls += 1
+
+
+def _history_after(entry_id: str, start_history_id: str) -> bool:
+    try:
+        return int(entry_id) > int(start_history_id)
+    except ValueError:
+        return entry_id > start_history_id
